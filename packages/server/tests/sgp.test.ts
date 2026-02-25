@@ -30,66 +30,64 @@ describe('SGP Calculator', () => {
     it('calculates HR SGP correctly', () => {
       const stats = makeHitterStats({ hr: 30 });
       const result = calculateSgpValue(stats, false, settings);
-      // HR SGP = 30 / 8 * 1.0 = 3.75
-      expect(result.categoryBreakdown['HR']).toBeCloseTo(3.75, 2);
+      // HR SGP = 30 / 9 * 1.0 = 3.333
+      expect(result.categoryBreakdown['HR']).toBeCloseTo(30 / 9, 2);
     });
 
     it('calculates R SGP correctly', () => {
       const stats = makeHitterStats({ runs: 100 });
       const result = calculateSgpValue(stats, false, settings);
-      // R SGP = 100 / 25 * 1.0 = 4.0
-      expect(result.categoryBreakdown['R']).toBeCloseTo(4.0, 2);
+      // R SGP = 100 / 19.2 * 1.0 = 5.208
+      expect(result.categoryBreakdown['R']).toBeCloseTo(100 / 19.2, 2);
     });
 
     it('calculates SB SGP correctly', () => {
       const stats = makeHitterStats({ sb: 20 });
       const result = calculateSgpValue(stats, false, settings);
-      // SB SGP = 20 / 10 * 1.0 = 2.0
-      expect(result.categoryBreakdown['SB']).toBeCloseTo(2.0, 2);
+      // SB SGP = 20 / 8 * 1.0 = 2.5
+      expect(result.categoryBreakdown['SB']).toBeCloseTo(2.5, 2);
     });
 
     it('calculates K (pitching) SGP correctly', () => {
       const stats = makePitcherStats({ strikeouts: 200 });
       const result = calculateSgpValue(stats, true, settings);
-      // K SGP = 200 / 30 * 1.0 = 6.667
-      expect(result.categoryBreakdown['K']).toBeCloseTo(6.667, 2);
+      // K SGP = 200 / 22.1 * 1.0 = 9.05
+      expect(result.categoryBreakdown['K']).toBeCloseTo(200 / 22.1, 2);
     });
 
     it('applies half-weight to W category', () => {
       const stats = makePitcherStats({ wins: 12 });
       const result = calculateSgpValue(stats, true, settings);
-      // W SGP = 12 / 3 * 0.5 = 2.0
-      expect(result.categoryBreakdown['W']).toBeCloseTo(2.0, 2);
+      // W SGP = 12 / 2.5 * 0.5 = 2.4
+      expect(result.categoryBreakdown['W']).toBeCloseTo(2.4, 2);
     });
   });
 
   describe('Rate stat SGP', () => {
-    it('calculates AVG SGP correctly (half-weighted)', () => {
-      // AVG = 160/550 ≈ .2909
-      const stats = makeHitterStats({ hits: 160, ab: 550 });
+    it('calculates AVG SGP correctly (half-weighted, diluted by PA)', () => {
+      // AVG = 160/550 ≈ .2909, diluted by PA/teamPA (600/6200)
+      const stats = makeHitterStats({ hits: 160, ab: 550, pa: 600 });
       const result = calculateSgpValue(stats, false, settings);
-      // AVG SGP = (0.2909 - 0.260) / 0.003 * 0.5 ≈ 5.15
       const expectedAvg = 160 / 550;
-      const expectedSgp = ((expectedAvg - 0.260) / 0.003) * 0.5;
-      expect(result.categoryBreakdown['AVG']).toBeCloseTo(expectedSgp, 1);
+      const expectedSgp = ((expectedAvg - 0.260) / 0.0017) * 0.5 * (600 / 6200);
+      expect(result.categoryBreakdown['AVG']).toBeCloseTo(expectedSgp, 2);
     });
 
-    it('calculates ERA SGP correctly (inverse)', () => {
-      // ERA = 60*9/180 = 3.00
+    it('calculates ERA SGP correctly (inverse, diluted by IP)', () => {
+      // ERA = 60*9/180 = 3.00, diluted by IP/teamIP (180/1200)
       const stats = makePitcherStats({ er: 60, ip: 180 });
       const result = calculateSgpValue(stats, true, settings);
-      // ERA SGP = (4.50 - 3.00) / 0.15 * 1.0 = 10.0
-      expect(result.categoryBreakdown['ERA']).toBeCloseTo(10.0, 2);
+      const expectedSgp = ((4.50 - 3.00) / 0.08) * 1.0 * (180 / 1200);
+      expect(result.categoryBreakdown['ERA']).toBeCloseTo(expectedSgp, 2);
     });
 
-    it('calculates WHIP SGP correctly (inverse)', () => {
-      // WHIP = (150+50)/180 ≈ 1.111
+    it('calculates WHIP SGP correctly (inverse, diluted by IP)', () => {
+      // WHIP = (150+50)/180 ≈ 1.111, diluted by IP/teamIP (180/1200)
       const stats = makePitcherStats({ hitsAllowed: 150, bbAllowed: 50, ip: 180 });
       const result = calculateSgpValue(stats, true, settings);
-      // WHIP SGP = (1.30 - 1.111) / 0.015 * 1.0 ≈ 12.59
       const whip = (150 + 50) / 180;
-      const expected = ((1.30 - whip) / 0.015) * 1.0;
-      expect(result.categoryBreakdown['WHIP']).toBeCloseTo(expected, 1);
+      const expected = ((1.30 - whip) / 0.0155) * 1.0 * (180 / 1200);
+      expect(result.categoryBreakdown['WHIP']).toBeCloseTo(expected, 2);
     });
 
     it('returns 0 SGP for rate stat when AB is 0', () => {
