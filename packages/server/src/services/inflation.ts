@@ -105,12 +105,13 @@ export function projectKeeperValue(
   for (let year = 1; year <= yearsForward; year++) {
     const projectedValue = Math.round(baseValue * Math.pow(0.95, year) * 10) / 10;
 
+    // Extension cost is a flat $5 bump added all at once when extending,
+    // not per year. E.g. $1 salary + $5 extension = $6 for all extension years.
     let projectedSalary: number;
     if (year <= contractYears) {
       projectedSalary = baseSalary;
     } else {
-      const extensions = year - contractYears;
-      projectedSalary = baseSalary + settings.extensionCostPerYear * extensions;
+      projectedSalary = baseSalary + settings.extensionCostPerYear;
     }
 
     const surplusValue = Math.round((projectedValue - projectedSalary) * 10) / 10;
