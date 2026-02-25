@@ -115,7 +115,7 @@ router.post('/calculate', async (_req, res) => {
         .update(schema.players)
         .set({
           auctionValue: vp.totalValue ?? null,
-          vorp: null,
+          vorp: vp.vorp ?? null,
           sgpValue: vp.sgpValue ?? null,
           updatedAt: new Date().toISOString(),
         })

@@ -4,6 +4,7 @@ import Dashboard from './pages/Dashboard.js';
 import TradeAnalyzer from './pages/TradeAnalyzer.js';
 import Rosters from './pages/Rosters.js';
 import Standings from './pages/Standings.js';
+import Keepers from './pages/Keepers.js';
 import DataImport from './pages/DataImport.js';
 import Settings from './pages/Settings.js';
 
@@ -15,6 +16,7 @@ export default function App() {
         <Route path="trade" element={<TradeAnalyzer />} />
         <Route path="rosters" element={<Rosters />} />
         <Route path="standings" element={<Standings />} />
+        <Route path="keepers" element={<Keepers />} />
         <Route path="import" element={<DataImport />} />
         <Route path="settings" element={<Settings />} />
       </Route>

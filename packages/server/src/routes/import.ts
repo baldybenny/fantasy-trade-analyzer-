@@ -8,13 +8,22 @@ import {
   importSavant,
   importFanTraxRoster,
 } from '../importers/index.js';
-import type { ProjectionSource } from '@fta/shared';
+import type { ProjectionSource, ProjectionRecord } from '@fta/shared';
+import {
+  fetchFanGraphsProjections,
+  transformFanGraphsBatting,
+  transformFanGraphsPitching,
+  type FanGraphsStatType,
+} from '../services/fangraphs-fetcher.js';
+import { fetchSavantData } from '../services/savant-fetcher.js';
+import type { StatcastRecord } from '../importers/index.js';
 
 const router = Router();
 
-/**
- * Find an existing player by name, or return null.
- */
+// ---------------------------------------------------------------------------
+// Player helpers
+// ---------------------------------------------------------------------------
+
 async function findPlayerByName(name: string) {
   const rows = await db
     .select()
@@ -24,9 +33,6 @@ async function findPlayerByName(name: string) {
   return rows[0] ?? null;
 }
 
-/**
- * Create a new player record with minimal info and return the inserted row.
- */
 async function createPlayer(name: string, team: string, positions: string[]) {
   const result = await db
     .insert(schema.players)
@@ -39,14 +45,235 @@ async function createPlayer(name: string, team: string, positions: string[]) {
   return result[0];
 }
 
-/**
- * POST /import - Import CSV data.
- *
- * Body: { type: string, source: string, csvContent: string }
- *   - type: 'batting' | 'pitching' | 'savant' | 'roster'
- *   - source: 'steamer' | 'zips' | 'atc' (for batting/pitching projections)
- *   - csvContent: raw CSV string
- */
+// ---------------------------------------------------------------------------
+// Shared upsert helpers (used by both CSV import and auto-fetch paths)
+// ---------------------------------------------------------------------------
+
+export async function upsertBattingProjections(
+  records: Omit<ProjectionRecord, 'id' | 'playerId'>[],
+  source: ProjectionSource,
+): Promise<{ imported: number; playersCreated: number }> {
+  let imported = 0;
+  let playersCreated = 0;
+
+  for (const record of records) {
+    let player = await findPlayerByName(record.playerName);
+    if (!player) {
+      player = await createPlayer(record.playerName, '', []);
+      playersCreated++;
+    }
+
+    const existing = await db
+      .select()
+      .from(schema.projections)
+      .where(eq(schema.projections.playerName, record.playerName))
+      .limit(100);
+
+    const existingForSource = existing.find(
+      (p) => p.source === source && p.isPitcher === false,
+    );
+
+    if (existingForSource) {
+      await db
+        .update(schema.projections)
+        .set({
+          playerId: player.id,
+          pa: record.pa,
+          ab: record.ab,
+          hits: record.hits,
+          doubles: record.doubles,
+          triples: record.triples,
+          hr: record.hr,
+          runs: record.runs,
+          rbi: record.rbi,
+          sb: record.sb,
+          cs: record.cs,
+          bb: record.bb,
+          so: record.so,
+        })
+        .where(eq(schema.projections.id, existingForSource.id));
+    } else {
+      await db.insert(schema.projections).values({
+        playerId: player.id,
+        playerName: record.playerName,
+        source,
+        isPitcher: false,
+        pa: record.pa,
+        ab: record.ab,
+        hits: record.hits,
+        doubles: record.doubles,
+        triples: record.triples,
+        hr: record.hr,
+        runs: record.runs,
+        rbi: record.rbi,
+        sb: record.sb,
+        cs: record.cs,
+        bb: record.bb,
+        so: record.so,
+        ip: 0,
+        wins: 0,
+        losses: 0,
+        saves: 0,
+        qs: 0,
+        er: 0,
+        hitsAllowed: 0,
+        bbAllowed: 0,
+        strikeouts: 0,
+      });
+    }
+
+    imported++;
+  }
+
+  return { imported, playersCreated };
+}
+
+export async function upsertPitchingProjections(
+  records: Omit<ProjectionRecord, 'id' | 'playerId'>[],
+  source: ProjectionSource,
+): Promise<{ imported: number; playersCreated: number }> {
+  let imported = 0;
+  let playersCreated = 0;
+
+  for (const record of records) {
+    let player = await findPlayerByName(record.playerName);
+    if (!player) {
+      player = await createPlayer(record.playerName, '', ['SP']);
+      playersCreated++;
+    }
+
+    const existing = await db
+      .select()
+      .from(schema.projections)
+      .where(eq(schema.projections.playerName, record.playerName))
+      .limit(100);
+
+    const existingForSource = existing.find(
+      (p) => p.source === source && p.isPitcher === true,
+    );
+
+    if (existingForSource) {
+      await db
+        .update(schema.projections)
+        .set({
+          playerId: player.id,
+          ip: record.ip,
+          wins: record.wins,
+          losses: record.losses,
+          saves: record.saves,
+          qs: record.qs,
+          er: record.er,
+          hitsAllowed: record.hitsAllowed,
+          bbAllowed: record.bbAllowed,
+          strikeouts: record.strikeouts,
+        })
+        .where(eq(schema.projections.id, existingForSource.id));
+    } else {
+      await db.insert(schema.projections).values({
+        playerId: player.id,
+        playerName: record.playerName,
+        source,
+        isPitcher: true,
+        pa: 0,
+        ab: 0,
+        hits: 0,
+        doubles: 0,
+        triples: 0,
+        hr: 0,
+        runs: 0,
+        rbi: 0,
+        sb: 0,
+        cs: 0,
+        bb: 0,
+        so: 0,
+        ip: record.ip,
+        wins: record.wins,
+        losses: record.losses,
+        saves: record.saves,
+        qs: record.qs,
+        er: record.er,
+        hitsAllowed: record.hitsAllowed,
+        bbAllowed: record.bbAllowed,
+        strikeouts: record.strikeouts,
+      });
+    }
+
+    imported++;
+  }
+
+  return { imported, playersCreated };
+}
+
+export async function upsertSavantData(
+  records: StatcastRecord[],
+): Promise<{ imported: number; playersCreated: number }> {
+  let imported = 0;
+  let playersCreated = 0;
+
+  for (const record of records) {
+    let player = await findPlayerByName(record.playerName);
+    if (!player) {
+      player = await createPlayer(record.playerName, '', []);
+      playersCreated++;
+    }
+
+    if (record.mlbamId && !player.mlbamId) {
+      await db
+        .update(schema.players)
+        .set({ mlbamId: record.mlbamId })
+        .where(eq(schema.players.id, player.id));
+    }
+
+    const existing = await db
+      .select()
+      .from(schema.statcastData)
+      .where(eq(schema.statcastData.playerName, record.playerName))
+      .limit(1);
+
+    if (existing.length > 0) {
+      await db
+        .update(schema.statcastData)
+        .set({
+          playerId: player.id,
+          mlbamId: record.mlbamId,
+          xba: record.xba,
+          xslg: record.xslg,
+          xwoba: record.xwoba,
+          exitVeloAvg: record.exitVeloAvg,
+          barrelPct: record.barrelPct,
+          hardHitPct: record.hardHitPct,
+          sprintSpeed: record.sprintSpeed,
+          kPct: record.kPct,
+          bbPct: record.bbPct,
+        })
+        .where(eq(schema.statcastData.id, existing[0].id));
+    } else {
+      await db.insert(schema.statcastData).values({
+        playerId: player.id,
+        playerName: record.playerName,
+        mlbamId: record.mlbamId,
+        xba: record.xba,
+        xslg: record.xslg,
+        xwoba: record.xwoba,
+        exitVeloAvg: record.exitVeloAvg,
+        barrelPct: record.barrelPct,
+        hardHitPct: record.hardHitPct,
+        sprintSpeed: record.sprintSpeed,
+        kPct: record.kPct,
+        bbPct: record.bbPct,
+      });
+    }
+
+    imported++;
+  }
+
+  return { imported, playersCreated };
+}
+
+// ---------------------------------------------------------------------------
+// CSV import endpoint (existing)
+// ---------------------------------------------------------------------------
+
 router.post('/import', async (req, res) => {
   try {
     const { type, source, csvContent } = req.body as {
@@ -80,9 +307,89 @@ router.post('/import', async (req, res) => {
   }
 });
 
+// ---------------------------------------------------------------------------
+// Auto-fetch endpoints
+// ---------------------------------------------------------------------------
+
 /**
- * Import FanGraphs batting projections.
+ * POST /import/fetch-projections
+ * Body: { system: 'steamer'|'zips'|'atc', statType: 'bat'|'pit' }
  */
+router.post('/import/fetch-projections', async (req, res) => {
+  try {
+    const { system, statType } = req.body as {
+      system?: string;
+      statType?: string;
+    };
+
+    if (!system || !['steamer', 'zips', 'atc'].includes(system)) {
+      return res.status(400).json({ error: 'system must be steamer, zips, or atc' });
+    }
+    if (!statType || !['bat', 'pit'].includes(statType)) {
+      return res.status(400).json({ error: 'statType must be bat or pit' });
+    }
+
+    const source = system as ProjectionSource;
+    const rawRows = await fetchFanGraphsProjections(source, statType as FanGraphsStatType);
+
+    let result: { imported: number; playersCreated: number };
+
+    if (statType === 'bat') {
+      const records = transformFanGraphsBatting(rawRows, source);
+      result = await upsertBattingProjections(records, source);
+    } else {
+      const records = transformFanGraphsPitching(rawRows, source);
+      result = await upsertPitchingProjections(records, source);
+    }
+
+    res.json({
+      success: true,
+      type: statType === 'bat' ? 'batting' : 'pitching',
+      source,
+      imported: result.imported,
+      playersCreated: result.playersCreated,
+    });
+  } catch (error) {
+    console.error('Error fetching projections:', error);
+    res.status(500).json({ error: `Failed to fetch projections: ${(error as Error).message}` });
+  }
+});
+
+/**
+ * POST /import/fetch-savant
+ * Body: { year?: number }
+ */
+router.post('/import/fetch-savant', async (req, res) => {
+  try {
+    const { year } = req.body as { year?: number };
+    const csvContent = await fetchSavantData(year);
+    const parsed = importSavant(csvContent);
+
+    if (parsed.data.length === 0) {
+      return res.status(400).json({
+        error: 'No valid statcast records fetched from Savant',
+        parseErrors: parsed.errors,
+      });
+    }
+
+    const result = await upsertSavantData(parsed.data);
+
+    res.json({
+      success: true,
+      type: 'savant',
+      imported: result.imported,
+      playersCreated: result.playersCreated,
+    });
+  } catch (error) {
+    console.error('Error fetching Savant data:', error);
+    res.status(500).json({ error: `Failed to fetch Savant data: ${(error as Error).message}` });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// CSV import handlers (refactored to use shared upsert helpers)
+// ---------------------------------------------------------------------------
+
 async function handleBattingImport(
   csvContent: string,
   source: ProjectionSource,
@@ -97,81 +404,7 @@ async function handleBattingImport(
     });
   }
 
-  let imported = 0;
-  let playersCreated = 0;
-
-  for (const record of result.data) {
-    // Find or create the player
-    let player = await findPlayerByName(record.playerName);
-    if (!player) {
-      player = await createPlayer(record.playerName, '', []);
-      playersCreated++;
-    }
-
-    // Check for existing projection with same player+source
-    const existing = await db
-      .select()
-      .from(schema.projections)
-      .where(eq(schema.projections.playerName, record.playerName))
-      .limit(100);
-
-    const existingForSource = existing.find(
-      (p) => p.source === source && p.isPitcher === false,
-    );
-
-    if (existingForSource) {
-      // Update existing projection
-      await db
-        .update(schema.projections)
-        .set({
-          playerId: player.id,
-          pa: record.pa,
-          ab: record.ab,
-          hits: record.hits,
-          doubles: record.doubles,
-          triples: record.triples,
-          hr: record.hr,
-          runs: record.runs,
-          rbi: record.rbi,
-          sb: record.sb,
-          cs: record.cs,
-          bb: record.bb,
-          so: record.so,
-        })
-        .where(eq(schema.projections.id, existingForSource.id));
-    } else {
-      // Insert new projection
-      await db.insert(schema.projections).values({
-        playerId: player.id,
-        playerName: record.playerName,
-        source,
-        isPitcher: false,
-        pa: record.pa,
-        ab: record.ab,
-        hits: record.hits,
-        doubles: record.doubles,
-        triples: record.triples,
-        hr: record.hr,
-        runs: record.runs,
-        rbi: record.rbi,
-        sb: record.sb,
-        cs: record.cs,
-        bb: record.bb,
-        so: record.so,
-        ip: 0,
-        wins: 0,
-        losses: 0,
-        saves: 0,
-        qs: 0,
-        er: 0,
-        hitsAllowed: 0,
-        bbAllowed: 0,
-        strikeouts: 0,
-      });
-    }
-
-    imported++;
-  }
+  const { imported, playersCreated } = await upsertBattingProjections(result.data, source);
 
   res.json({
     success: true,
@@ -183,9 +416,6 @@ async function handleBattingImport(
   });
 }
 
-/**
- * Import FanGraphs pitching projections.
- */
 async function handlePitchingImport(
   csvContent: string,
   source: ProjectionSource,
@@ -200,78 +430,7 @@ async function handlePitchingImport(
     });
   }
 
-  let imported = 0;
-  let playersCreated = 0;
-
-  for (const record of result.data) {
-    // Find or create the player
-    let player = await findPlayerByName(record.playerName);
-    if (!player) {
-      player = await createPlayer(record.playerName, '', ['SP']);
-      playersCreated++;
-    }
-
-    // Check for existing projection with same player+source
-    const existing = await db
-      .select()
-      .from(schema.projections)
-      .where(eq(schema.projections.playerName, record.playerName))
-      .limit(100);
-
-    const existingForSource = existing.find(
-      (p) => p.source === source && p.isPitcher === true,
-    );
-
-    if (existingForSource) {
-      // Update existing projection
-      await db
-        .update(schema.projections)
-        .set({
-          playerId: player.id,
-          ip: record.ip,
-          wins: record.wins,
-          losses: record.losses,
-          saves: record.saves,
-          qs: record.qs,
-          er: record.er,
-          hitsAllowed: record.hitsAllowed,
-          bbAllowed: record.bbAllowed,
-          strikeouts: record.strikeouts,
-        })
-        .where(eq(schema.projections.id, existingForSource.id));
-    } else {
-      // Insert new projection
-      await db.insert(schema.projections).values({
-        playerId: player.id,
-        playerName: record.playerName,
-        source,
-        isPitcher: true,
-        pa: 0,
-        ab: 0,
-        hits: 0,
-        doubles: 0,
-        triples: 0,
-        hr: 0,
-        runs: 0,
-        rbi: 0,
-        sb: 0,
-        cs: 0,
-        bb: 0,
-        so: 0,
-        ip: record.ip,
-        wins: record.wins,
-        losses: record.losses,
-        saves: record.saves,
-        qs: record.qs,
-        er: record.er,
-        hitsAllowed: record.hitsAllowed,
-        bbAllowed: record.bbAllowed,
-        strikeouts: record.strikeouts,
-      });
-    }
-
-    imported++;
-  }
+  const { imported, playersCreated } = await upsertPitchingProjections(result.data, source);
 
   res.json({
     success: true,
@@ -283,100 +442,30 @@ async function handlePitchingImport(
   });
 }
 
-/**
- * Import Baseball Savant statcast data.
- */
 async function handleSavantImport(
   csvContent: string,
   res: import('express').Response,
 ) {
-  const result = importSavant(csvContent);
+  const parsed = importSavant(csvContent);
 
-  if (result.data.length === 0) {
+  if (parsed.data.length === 0) {
     return res.status(400).json({
       error: 'No valid statcast records parsed from CSV',
-      parseErrors: result.errors,
+      parseErrors: parsed.errors,
     });
   }
 
-  let imported = 0;
-  let playersCreated = 0;
-
-  for (const record of result.data) {
-    // Find or create the player
-    let player = await findPlayerByName(record.playerName);
-    if (!player) {
-      player = await createPlayer(record.playerName, '', []);
-      playersCreated++;
-    }
-
-    // Update player's mlbamId if we have one and they don't
-    if (record.mlbamId && !player.mlbamId) {
-      await db
-        .update(schema.players)
-        .set({ mlbamId: record.mlbamId })
-        .where(eq(schema.players.id, player.id));
-    }
-
-    // Check for existing statcast data for this player
-    const existing = await db
-      .select()
-      .from(schema.statcastData)
-      .where(eq(schema.statcastData.playerName, record.playerName))
-      .limit(1);
-
-    if (existing.length > 0) {
-      // Update existing statcast record
-      await db
-        .update(schema.statcastData)
-        .set({
-          playerId: player.id,
-          mlbamId: record.mlbamId,
-          xba: record.xba,
-          xslg: record.xslg,
-          xwoba: record.xwoba,
-          exitVeloAvg: record.exitVeloAvg,
-          barrelPct: record.barrelPct,
-          hardHitPct: record.hardHitPct,
-          sprintSpeed: record.sprintSpeed,
-          kPct: record.kPct,
-          bbPct: record.bbPct,
-        })
-        .where(eq(schema.statcastData.id, existing[0].id));
-    } else {
-      // Insert new statcast record
-      await db.insert(schema.statcastData).values({
-        playerId: player.id,
-        playerName: record.playerName,
-        mlbamId: record.mlbamId,
-        xba: record.xba,
-        xslg: record.xslg,
-        xwoba: record.xwoba,
-        exitVeloAvg: record.exitVeloAvg,
-        barrelPct: record.barrelPct,
-        hardHitPct: record.hardHitPct,
-        sprintSpeed: record.sprintSpeed,
-        kPct: record.kPct,
-        bbPct: record.bbPct,
-      });
-    }
-
-    imported++;
-  }
+  const { imported, playersCreated } = await upsertSavantData(parsed.data);
 
   res.json({
     success: true,
     type: 'savant',
     imported,
     playersCreated,
-    parseErrors: result.errors,
+    parseErrors: parsed.errors,
   });
 }
 
-/**
- * Import FanTrax roster data.
- * Creates/updates teams and assigns players to their fantasy teams.
- */
 async function handleRosterImport(
   csvContent: string,
   res: import('express').Response,
@@ -390,7 +479,6 @@ async function handleRosterImport(
     });
   }
 
-  // Collect unique fantasy team names from the import
   const teamNames = new Set<string>();
   for (const record of result.data) {
     if (record.fantasyTeam) {
@@ -398,7 +486,6 @@ async function handleRosterImport(
     }
   }
 
-  // Create or find teams by name, building a name -> id map
   const teamMap: Record<string, number> = {};
   for (const teamName of teamNames) {
     const existing = await db
@@ -428,14 +515,12 @@ async function handleRosterImport(
   for (const record of result.data) {
     const fantasyTeamId = record.fantasyTeam ? teamMap[record.fantasyTeam] ?? null : null;
 
-    // Find or create the player
     let player = await findPlayerByName(record.playerName);
     if (!player) {
       player = await createPlayer(record.playerName, record.team, record.positions);
       playersCreated++;
     }
 
-    // Update the player with roster assignment data
     await db
       .update(schema.players)
       .set({
@@ -454,8 +539,7 @@ async function handleRosterImport(
     playersImported++;
   }
 
-  // Recalculate team spending totals
-  for (const [teamName, teamId] of Object.entries(teamMap)) {
+  for (const [_teamName, teamId] of Object.entries(teamMap)) {
     const teamPlayers = await db
       .select()
       .from(schema.players)

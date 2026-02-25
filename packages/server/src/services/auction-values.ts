@@ -31,6 +31,8 @@ export interface AuctionValue {
   totalValue: number;
   /** Raw SGP value before replacement-level adjustment */
   sgpValue: number;
+  /** Value over replacement player */
+  vorp: number;
   /** Per-category SGP breakdown */
   categoryValues: Record<string, number>;
   /** Whether the player is above replacement level */
@@ -232,6 +234,7 @@ export function calculateAuctionValues(
       position: e.position,
       totalValue: Math.round(dollarValue * 10) / 10, // round to 1 decimal
       sgpValue: Math.round(e.sgp * 100) / 100,
+      vorp: Math.round(e.vorp * 100) / 100,
       categoryValues: e.breakdown,
       isAboveReplacement: isAbove,
     };

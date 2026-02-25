@@ -21,12 +21,12 @@ export default function Standings() {
     queryFn: api.getStandings,
   });
 
-  const teamStandings = standings?.teamStandings ?? [];
+  const teamStandings = Array.isArray(standings) ? standings : standings?.teamStandings ?? [];
   const sorted = [...teamStandings].sort((a: any, b: any) => (b.totalPoints ?? 0) - (a.totalPoints ?? 0));
   const numTeams = sorted.length;
 
   // Collect all category names
-  const categories: string[] = sorted[0]?.standings?.map((s: any) => s.category) ?? [];
+  const categories: string[] = (sorted[0]?.categoryStandings ?? sorted[0]?.standings ?? []).map((s: any) => s.category);
 
   if (isLoading) {
     return (
@@ -67,13 +67,13 @@ export default function Standings() {
           <tbody>
             {sorted.map((team: any, idx: number) => {
               const standingsMap: Record<string, any> = {};
-              (team.standings ?? []).forEach((s: any) => { standingsMap[s.category] = s; });
+              (team.categoryStandings ?? team.standings ?? []).forEach((s: any) => { standingsMap[s.category] = s; });
 
               return (
-                <tr key={team.teamId} className="border-b border-gray-800/50 hover:bg-gray-800/30">
+                <tr key={team.id ?? team.teamId} className="border-b border-gray-800/50 hover:bg-gray-800/30">
                   <td className="py-2 px-3 text-gray-400 sticky left-0 bg-gray-900">{idx + 1}</td>
                   <td className="py-2 px-3 font-medium text-gray-200 sticky left-12 bg-gray-900">
-                    {team.teamName}
+                    {team.name ?? team.teamName}
                   </td>
                   <td className="text-right py-2 px-3 font-medium text-white">
                     {(team.totalPoints ?? 0).toFixed(1)}

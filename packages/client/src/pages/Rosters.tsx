@@ -10,6 +10,7 @@ function PlayerRow({ player }: { player: Player }) {
   const surplus = player.auctionValue && salary != null
     ? (player.auctionValue - salary).toFixed(1)
     : '—';
+  const vorp = player.vorp != null ? player.vorp.toFixed(1) : '—';
 
   return (
     <tr className="border-b border-gray-800/50 hover:bg-gray-800/30">
@@ -17,6 +18,11 @@ function PlayerRow({ player }: { player: Player }) {
       <td className="py-2 px-3 text-gray-400 text-xs">{positions}</td>
       <td className="py-2 px-3 text-gray-400">{player.team}</td>
       <td className="text-right py-2 px-3 text-gray-300">${value}</td>
+      <td className={`text-right py-2 px-3 ${
+        Number(vorp) > 0 ? 'text-blue-400' : 'text-gray-500'
+      }`}>
+        {vorp}
+      </td>
       <td className="text-right py-2 px-3 text-gray-400">
         {salary != null ? `$${salary}` : '—'}
       </td>
@@ -48,6 +54,19 @@ export default function Rosters() {
   );
   const pitchers = roster.filter((p) =>
     p.positions?.some((pos: string) => pos === 'SP' || pos === 'RP'),
+  );
+
+  const tableHeaders = (
+    <tr className="text-gray-500 border-b border-gray-800">
+      <th className="text-left py-2 px-3">Name</th>
+      <th className="text-left py-2 px-3">Pos</th>
+      <th className="text-left py-2 px-3">Team</th>
+      <th className="text-right py-2 px-3">Value</th>
+      <th className="text-right py-2 px-3">VORP</th>
+      <th className="text-right py-2 px-3">Salary</th>
+      <th className="text-right py-2 px-3">Surplus</th>
+      <th className="py-2 px-3">Status</th>
+    </tr>
   );
 
   return (
@@ -106,17 +125,7 @@ export default function Rosters() {
                 <h3 className="text-sm font-medium text-gray-400">Hitters ({hitters.length})</h3>
               </div>
               <table className="w-full text-sm">
-                <thead>
-                  <tr className="text-gray-500 border-b border-gray-800">
-                    <th className="text-left py-2 px-3">Name</th>
-                    <th className="text-left py-2 px-3">Pos</th>
-                    <th className="text-left py-2 px-3">Team</th>
-                    <th className="text-right py-2 px-3">Value</th>
-                    <th className="text-right py-2 px-3">Salary</th>
-                    <th className="text-right py-2 px-3">Surplus</th>
-                    <th className="py-2 px-3">Status</th>
-                  </tr>
-                </thead>
+                <thead>{tableHeaders}</thead>
                 <tbody>
                   {hitters.map((p) => <PlayerRow key={p.id} player={p} />)}
                 </tbody>
@@ -131,17 +140,7 @@ export default function Rosters() {
                 <h3 className="text-sm font-medium text-gray-400">Pitchers ({pitchers.length})</h3>
               </div>
               <table className="w-full text-sm">
-                <thead>
-                  <tr className="text-gray-500 border-b border-gray-800">
-                    <th className="text-left py-2 px-3">Name</th>
-                    <th className="text-left py-2 px-3">Pos</th>
-                    <th className="text-left py-2 px-3">Team</th>
-                    <th className="text-right py-2 px-3">Value</th>
-                    <th className="text-right py-2 px-3">Salary</th>
-                    <th className="text-right py-2 px-3">Surplus</th>
-                    <th className="py-2 px-3">Status</th>
-                  </tr>
-                </thead>
+                <thead>{tableHeaders}</thead>
                 <tbody>
                   {pitchers.map((p) => <PlayerRow key={p.id} player={p} />)}
                 </tbody>

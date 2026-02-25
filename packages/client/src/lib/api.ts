@@ -29,12 +29,25 @@ export const api = {
   searchPlayers: (query: string) => request<any[]>(`/players/search?q=${encodeURIComponent(query)}`),
   getPlayer: (id: number) => request<any>(`/players/${id}`),
 
-  // Import
+  // Import (CSV)
   importData: (data: { type: string; source: string; csvContent: string }) =>
     request<any>('/projections/import', { method: 'POST', body: JSON.stringify(data) }),
 
   importRosters: (data: { type: string; source: string; csvContent: string }) =>
     request<any>('/rosters/import', { method: 'POST', body: JSON.stringify(data) }),
+
+  // Auto-fetch
+  fetchProjections: (system: string, statType: string) =>
+    request<any>('/projections/import/fetch-projections', {
+      method: 'POST',
+      body: JSON.stringify({ system, statType }),
+    }),
+
+  fetchSavant: (year?: number) =>
+    request<any>('/projections/import/fetch-savant', {
+      method: 'POST',
+      body: JSON.stringify({ year }),
+    }),
 
   // Standings
   getStandings: () => request<any>('/standings'),
@@ -49,4 +62,16 @@ export const api = {
   // Values
   calculateValues: () => request<any>('/values/calculate', { method: 'POST' }),
   getValues: () => request<any[]>('/values'),
+
+  // Fantrax
+  fantraxStatus: () => request<any>('/fantrax/status'),
+  fantraxConfigure: (leagueId: string, cookie: string) =>
+    request<any>('/fantrax/config', { method: 'POST', body: JSON.stringify({ leagueId, cookie }) }),
+  fantraxSync: () => request<any>('/fantrax/sync', { method: 'POST' }),
+
+  // Keepers
+  getInflation: () => request<any>('/keepers/inflation'),
+  getScarcity: () => request<any[]>('/keepers/scarcity'),
+  getKeeperAnalysis: (teamId?: number) =>
+    request<any>(teamId != null ? `/keepers/analysis?teamId=${teamId}` : '/keepers/analysis'),
 };

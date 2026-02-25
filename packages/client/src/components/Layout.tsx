@@ -5,6 +5,7 @@ const navItems = [
   { to: '/trade', label: 'Trade Analyzer', icon: '⇄' },
   { to: '/rosters', label: 'Rosters', icon: '☰' },
   { to: '/standings', label: 'Standings', icon: '▤' },
+  { to: '/keepers', label: 'Keepers', icon: '★' },
   { to: '/import', label: 'Data Import', icon: '↑' },
   { to: '/settings', label: 'Settings', icon: '⚙' },
 ];

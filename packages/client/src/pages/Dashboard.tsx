@@ -34,12 +34,12 @@ export default function Dashboard() {
   });
   const { data: teams = [] } = useQuery({ queryKey: ['teams'], queryFn: api.getTeams });
 
-  const teamStandings = standings?.teamStandings ?? [];
+  const teamStandings = Array.isArray(standings) ? standings : standings?.teamStandings ?? [];
   const numTeams = teamStandings.length || 14;
 
   // Find "my" team (first team or highest ranked)
   const myTeam = teamStandings[0];
-  const myStandings = myTeam?.standings ?? [];
+  const myStandings = myTeam?.categoryStandings ?? myTeam?.standings ?? [];
 
   const strongest = [...myStandings].sort((a: any, b: any) => a.rank - b.rank).slice(0, 3);
   const weakest = [...myStandings].sort((a: any, b: any) => b.rank - a.rank).slice(0, 3);
