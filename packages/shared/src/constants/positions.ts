@@ -14,26 +14,28 @@ export const HITTING_POSITIONS: Position[] = [
 export const PITCHING_POSITIONS: Position[] = [Position.SP, Position.RP];
 
 export const DEFAULT_POSITION_SLOTS: Record<string, number> = {
-  C: 1,
+  C: 2,
   '1B': 1,
   '2B': 1,
   '3B': 1,
   SS: 1,
+  CI: 1,
+  MI: 1,
   OF: 5,
   UTIL: 1,
-  SP: 7,
-  RP: 5,
-  Bench: 2,
+  P: 9,
 };
 
 export const DEFAULT_REPLACEMENT_LEVEL: Record<string, number> = {
-  C: 12,
-  '1B': 24,
+  C: 24,
+  '1B': 18,
   '2B': 18,
   '3B': 18,
   SS: 18,
   OF: 60,
-  SP: 84,
+  DH: 120,
+  UTIL: 120,
+  SP: 72,
   RP: 36,
 };
 

@@ -69,16 +69,23 @@ export async function fetchFanGraphsProjections(
 /**
  * Transform FanGraphs batting JSON rows to ProjectionRecord shape.
  */
+export interface FanGraphsTransformResult extends Omit<ProjectionRecord, 'id' | 'playerId'> {
+  position?: string;
+  team?: string;
+}
+
 export function transformFanGraphsBatting(
   rows: Record<string, any>[],
   source: ProjectionSource,
-): Omit<ProjectionRecord, 'id' | 'playerId'>[] {
+): FanGraphsTransformResult[] {
   return rows
     .filter((r) => r.PlayerName)
     .map((r) => ({
       playerName: r.PlayerName as string,
       source,
       isPitcher: false,
+      position: (r.minpos as string | undefined) ?? undefined,
+      team: (r.Team as string | undefined) ?? undefined,
       pa: Number(r.PA) || 0,
       ab: Number(r.AB) || 0,
       hits: Number(r.H) || 0,
@@ -110,13 +117,15 @@ export function transformFanGraphsBatting(
 export function transformFanGraphsPitching(
   rows: Record<string, any>[],
   source: ProjectionSource,
-): Omit<ProjectionRecord, 'id' | 'playerId'>[] {
+): FanGraphsTransformResult[] {
   return rows
     .filter((r) => r.PlayerName)
     .map((r) => ({
       playerName: r.PlayerName as string,
       source,
       isPitcher: true,
+      position: (Number(r.SV) || 0) >= 5 ? 'RP' : 'SP',
+      team: (r.Team as string | undefined) ?? undefined,
       // Zero out hitting
       pa: 0,
       ab: 0,

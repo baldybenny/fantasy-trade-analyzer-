@@ -14,6 +14,7 @@ import {
   transformFanGraphsBatting,
   transformFanGraphsPitching,
   type FanGraphsStatType,
+  type FanGraphsTransformResult,
 } from '../services/fangraphs-fetcher.js';
 import { fetchSavantData } from '../services/savant-fetcher.js';
 import type { StatcastRecord } from '../importers/index.js';
@@ -50,7 +51,7 @@ async function createPlayer(name: string, team: string, positions: string[]) {
 // ---------------------------------------------------------------------------
 
 export async function upsertBattingProjections(
-  records: Omit<ProjectionRecord, 'id' | 'playerId'>[],
+  records: FanGraphsTransformResult[],
   source: ProjectionSource,
 ): Promise<{ imported: number; playersCreated: number }> {
   let imported = 0;
@@ -58,9 +59,19 @@ export async function upsertBattingProjections(
 
   for (const record of records) {
     let player = await findPlayerByName(record.playerName);
+    const pos = record.position ? record.position.split('/').filter(Boolean) : [];
     if (!player) {
-      player = await createPlayer(record.playerName, '', []);
+      player = await createPlayer(record.playerName, record.team ?? '', pos);
       playersCreated++;
+    } else if (pos.length > 0) {
+      const existingPos: string[] = JSON.parse(player.positions);
+      const needsUpdate = existingPos.length === 0 || existingPos.some((p) => p.includes('/'));
+      if (needsUpdate) {
+        await db.update(schema.players).set({
+          positions: JSON.stringify(pos),
+          team: record.team || player.team,
+        }).where(eq(schema.players.id, player.id));
+      }
     }
 
     const existing = await db
@@ -129,7 +140,7 @@ export async function upsertBattingProjections(
 }
 
 export async function upsertPitchingProjections(
-  records: Omit<ProjectionRecord, 'id' | 'playerId'>[],
+  records: FanGraphsTransformResult[],
   source: ProjectionSource,
 ): Promise<{ imported: number; playersCreated: number }> {
   let imported = 0;
@@ -137,9 +148,19 @@ export async function upsertPitchingProjections(
 
   for (const record of records) {
     let player = await findPlayerByName(record.playerName);
+    const pos = record.position ? record.position.split('/').filter(Boolean) : ['SP'];
     if (!player) {
-      player = await createPlayer(record.playerName, '', ['SP']);
+      player = await createPlayer(record.playerName, record.team ?? '', pos);
       playersCreated++;
+    } else if (pos.length > 0) {
+      const existingPos: string[] = JSON.parse(player.positions);
+      const needsUpdate = existingPos.length === 0 || existingPos.some((p) => p.includes('/'));
+      if (needsUpdate) {
+        await db.update(schema.players).set({
+          positions: JSON.stringify(pos),
+          team: record.team || player.team,
+        }).where(eq(schema.players.id, player.id));
+      }
     }
 
     const existing = await db

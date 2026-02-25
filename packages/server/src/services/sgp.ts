@@ -111,33 +111,56 @@ function countingStatSgp(
 // ---------------------------------------------------------------------------
 
 /**
+ * Estimated team-total playing time, used to dilute rate stats.
+ *
+ * SGP multipliers for rate stats (AVG .003, ERA .15, etc.) are team-level
+ * metrics — the typical spread between adjacent teams in the standings. A
+ * single player only moves the team's aggregate rate in proportion to their
+ * share of the team's total playing time, so we scale by player_PT / team_PT.
+ *
+ * 13 hitting slots × ~480 avg PA ≈ 6200;  9 P slots × ~135 avg IP ≈ 1200.
+ */
+const TEAM_PA = 6200;
+const TEAM_IP = 1200;
+
+/**
  * SGP for a non-inverse rate stat (AVG, OPS):
- *   `(projected_rate - baseline) / sgp_multiplier * weight`
+ *   `(projected_rate - baseline) / sgp_multiplier * weight * (PA / teamPA)`
+ *
+ * The dilution factor reflects that one hitter is only a fraction of the
+ * team's composite batting line.
  */
 function rateStatSgp(
   projectedRate: number,
   baseline: number,
   multiplier: number,
   weight: number,
+  playingTime: number,
+  teamPlayingTime: number,
 ): number {
   if (multiplier === 0) return 0;
-  return ((projectedRate - baseline) / multiplier) * weight;
+  const dilution = playingTime / teamPlayingTime;
+  return ((projectedRate - baseline) / multiplier) * weight * dilution;
 }
 
 /**
  * SGP for an inverse rate stat (ERA, WHIP):
- *   `(baseline - projected_rate) / sgp_multiplier * weight`
+ *   `(baseline - projected_rate) / sgp_multiplier * weight * (IP / teamIP)`
  *
- * Lower is better, so invert the difference.
+ * Lower is better, so invert the difference. Diluted by the pitcher's share
+ * of team innings.
  */
 function inverseRateStatSgp(
   projectedRate: number,
   baseline: number,
   multiplier: number,
   weight: number,
+  playingTime: number,
+  teamPlayingTime: number,
 ): number {
   if (multiplier === 0) return 0;
-  return ((baseline - projectedRate) / multiplier) * weight;
+  const dilution = playingTime / teamPlayingTime;
+  return ((baseline - projectedRate) / multiplier) * weight * dilution;
 }
 
 // ---------------------------------------------------------------------------
@@ -175,7 +198,7 @@ export function calculateSgpValue(
       total += sgp;
     }
 
-    // Rate hitting stats (AVG, OPS)
+    // Rate hitting stats (AVG, OPS) — weighted by PA
     for (const cat of RATE_HITTING_CATEGORIES) {
       const multiplier = getMultiplier(settings, cat);
       const weight = getCategoryWeight(settings, cat);
@@ -187,7 +210,7 @@ export function calculateSgpValue(
         continue;
       }
 
-      const sgp = rateStatSgp(projectedRate, baseline, multiplier, weight);
+      const sgp = rateStatSgp(projectedRate, baseline, multiplier, weight, stats.pa, TEAM_PA);
       breakdown[cat] = sgp;
       total += sgp;
     }
@@ -205,7 +228,7 @@ export function calculateSgpValue(
       total += sgp;
     }
 
-    // Rate pitching stats (ERA, WHIP)
+    // Rate pitching stats (ERA, WHIP) — weighted by IP
     for (const cat of RATE_PITCHING_CATEGORIES) {
       const multiplier = getMultiplier(settings, cat);
       const weight = getCategoryWeight(settings, cat);
@@ -220,8 +243,8 @@ export function calculateSgpValue(
       // ERA and WHIP are inverse: lower is better
       const inverse = isInverseCategory(settings, cat);
       const sgp = inverse
-        ? inverseRateStatSgp(projectedRate, baseline, multiplier, weight)
-        : rateStatSgp(projectedRate, baseline, multiplier, weight);
+        ? inverseRateStatSgp(projectedRate, baseline, multiplier, weight, stats.ip, TEAM_IP)
+        : rateStatSgp(projectedRate, baseline, multiplier, weight, stats.ip, TEAM_IP);
 
       breakdown[cat] = sgp;
       total += sgp;

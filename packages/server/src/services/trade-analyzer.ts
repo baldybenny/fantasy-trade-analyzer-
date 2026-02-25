@@ -30,7 +30,7 @@ import {
   clamp,
 } from '@fta/shared';
 import { calculateSgpValue } from './sgp.js';
-import { calculateAuctionValues, sgpToDollars, calculateVorp } from './auction-values.js';
+import { calculateAuctionValues } from './auction-values.js';
 import {
   simulateTradeStandings,
   type StandingsSnapshot,
