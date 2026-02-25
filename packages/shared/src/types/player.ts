@@ -128,6 +128,7 @@ export interface Player {
 
   // Values
   auctionValue?: number;
+  inflatedValue?: number;
   vorp?: number;
   sgpValue?: number;
 }

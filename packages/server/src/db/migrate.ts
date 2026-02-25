@@ -24,6 +24,7 @@ function migrate() {
       current_stats TEXT,
       ros_projection TEXT,
       auction_value REAL,
+      inflated_value REAL,
       vorp REAL,
       sgp_value REAL,
       created_at TEXT NOT NULL,
@@ -162,6 +163,12 @@ function migrate() {
     CREATE INDEX IF NOT EXISTS idx_article_players_article ON article_players(article_id);
     CREATE INDEX IF NOT EXISTS idx_article_players_player ON article_players(player_id);
   `);
+
+  // Add inflated_value column if it doesn't exist (for existing databases)
+  const cols = sqlite.pragma('table_info(players)') as Array<{ name: string }>;
+  if (!cols.some((c) => c.name === 'inflated_value')) {
+    sqlite.exec('ALTER TABLE players ADD COLUMN inflated_value REAL');
+  }
 
   console.log('Database migration complete.');
 }

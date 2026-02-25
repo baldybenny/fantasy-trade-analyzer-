@@ -6,10 +6,13 @@ import type { Player } from '@fta/shared';
 function PlayerRow({ player }: { player: Player }) {
   const positions = player.positions?.join('/') ?? '';
   const value = player.auctionValue?.toFixed(1) ?? '—';
+  const inflated = player.inflatedValue?.toFixed(1) ?? '—';
   const salary = player.contract?.salary;
-  const surplus = player.auctionValue && salary != null
-    ? (player.auctionValue - salary).toFixed(1)
-    : '—';
+  const surplus = player.inflatedValue != null && salary != null
+    ? (player.inflatedValue - salary).toFixed(1)
+    : player.auctionValue != null && salary != null
+      ? (player.auctionValue - salary).toFixed(1)
+      : '—';
   const vorp = player.vorp != null ? player.vorp.toFixed(1) : '—';
 
   return (
@@ -18,6 +21,7 @@ function PlayerRow({ player }: { player: Player }) {
       <td className="py-2 px-3 text-gray-400 text-xs">{positions}</td>
       <td className="py-2 px-3 text-gray-400">{player.team}</td>
       <td className="text-right py-2 px-3 text-gray-300">${value}</td>
+      <td className="text-right py-2 px-3 text-yellow-400">${inflated}</td>
       <td className={`text-right py-2 px-3 ${
         Number(vorp) > 0 ? 'text-blue-400' : 'text-gray-500'
       }`}>
@@ -62,6 +66,7 @@ export default function Rosters() {
       <th className="text-left py-2 px-3">Pos</th>
       <th className="text-left py-2 px-3">Team</th>
       <th className="text-right py-2 px-3">Value</th>
+      <th className="text-right py-2 px-3">Inflated</th>
       <th className="text-right py-2 px-3">VORP</th>
       <th className="text-right py-2 px-3">Salary</th>
       <th className="text-right py-2 px-3">Surplus</th>

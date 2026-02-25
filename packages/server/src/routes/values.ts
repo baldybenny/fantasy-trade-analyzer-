@@ -3,6 +3,7 @@ import { eq, sql } from 'drizzle-orm';
 import { db } from '../db/database.js';
 import * as schema from '../db/schema.js';
 import { calculateAuctionValues } from '../services/auction-values.js';
+import { calculateInflation, applyInflation } from '../services/inflation.js';
 import type { LeagueSettings, ProjectionSource } from '@fta/shared';
 import { DEFAULT_LEAGUE_SETTINGS, DEFAULT_PROJECTION_WEIGHTS } from '@fta/shared';
 import { dbRowToPlayer } from '../db/helpers.js';
@@ -150,12 +151,27 @@ router.post('/calculate', async (_req, res) => {
       numTeams,
     );
 
+    // Compute inflation from keeper data
+    // We need players with their freshly-computed auction values for inflation calc
+    const playersWithValues = players.map((p) => {
+      const vp = valuedPlayers.find((v) => v.playerId === p.id);
+      return vp ? { ...p, auctionValue: vp.totalValue } : p;
+    });
+    const inflation = calculateInflation(playersWithValues, settings, numTeams);
+
+    // Add inflatedValue to each valued player
+    const valuedWithInflation = valuedPlayers.map((vp) => ({
+      ...vp,
+      inflatedValue: applyInflation(vp.totalValue, inflation.inflationRate),
+    }));
+
     // Update player records in DB with computed values
-    for (const vp of valuedPlayers) {
+    for (const vp of valuedWithInflation) {
       await db
         .update(schema.players)
         .set({
           auctionValue: vp.totalValue ?? null,
+          inflatedValue: vp.inflatedValue ?? null,
           vorp: vp.vorp ?? null,
           sgpValue: vp.sgpValue ?? null,
           updatedAt: new Date().toISOString(),
@@ -164,12 +180,14 @@ router.post('/calculate', async (_req, res) => {
     }
 
     // Sort by totalValue descending
-    valuedPlayers.sort((a, b) => (b.totalValue ?? 0) - (a.totalValue ?? 0));
+    valuedWithInflation.sort((a, b) => (b.totalValue ?? 0) - (a.totalValue ?? 0));
 
     res.json({
       success: true,
-      playersUpdated: valuedPlayers.length,
-      players: valuedPlayers,
+      playersUpdated: valuedWithInflation.length,
+      inflationRate: inflation.inflationRate,
+      inflationPercentage: inflation.inflationPercentage,
+      players: valuedWithInflation,
     });
   } catch (error) {
     console.error('Error calculating auction values:', error);

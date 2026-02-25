@@ -23,6 +23,7 @@ export const players = sqliteTable('players', {
 
   // Computed values
   auctionValue: real('auction_value'),
+  inflatedValue: real('inflated_value'),
   vorp: real('vorp'),
   sgpValue: real('sgp_value'),
 

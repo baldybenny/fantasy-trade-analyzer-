@@ -23,6 +23,7 @@ export function dbRowToPlayer(row: any): Player {
     currentSeason: row.currentStats ? (typeof row.currentStats === 'string' ? JSON.parse(row.currentStats) : row.currentStats) : undefined,
     rosProjection: row.rosProjection ? (typeof row.rosProjection === 'string' ? JSON.parse(row.rosProjection) : row.rosProjection) : undefined,
     auctionValue: row.auctionValue ?? undefined,
+    inflatedValue: row.inflatedValue ?? undefined,
     vorp: row.vorp ?? undefined,
     sgpValue: row.sgpValue ?? undefined,
   };
