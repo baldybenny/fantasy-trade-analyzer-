@@ -33,13 +33,15 @@ export function calculateInflation(
 ): InflationResult {
   const totalLeagueBudget = settings.totalBudget * numTeams;
 
-  // Keepers = rostered players with salary > 0 and an auction value
+  // Keepers = players explicitly marked as keepers, OR rostered players
+  // whose auction value exceeds their salary (positive surplus = likely kept)
   const keepers = players.filter(
     (p) =>
       p.fantasyTeamId != null &&
       p.contract != null &&
       p.contract.salary > 0 &&
-      p.auctionValue != null,
+      p.auctionValue != null &&
+      (p.contract.isKeeper || (p.auctionValue ?? 0) > p.contract.salary),
   );
 
   const totalKeeperSalary = keepers.reduce(
