@@ -8,6 +8,7 @@ import { tradeRoutes } from './trade.js';
 import { valuesRoutes } from './values.js';
 import { fantraxRoutes } from './fantrax.js';
 import { keeperRoutes } from './keepers.js';
+import { newsRoutes } from './news.js';
 
 export function registerRoutes(app: Express) {
   app.use('/api/league', leagueRoutes);
@@ -20,4 +21,5 @@ export function registerRoutes(app: Express) {
   app.use('/api/values', valuesRoutes);
   app.use('/api/fantrax', fantraxRoutes);
   app.use('/api/keepers', keeperRoutes);
+  app.use('/api/news', newsRoutes);
 }

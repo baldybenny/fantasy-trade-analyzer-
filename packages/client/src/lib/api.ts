@@ -86,4 +86,54 @@ export const api = {
   getScarcity: () => request<any[]>('/keepers/scarcity'),
   getKeeperAnalysis: (teamId?: number) =>
     request<any>(teamId != null ? `/keepers/analysis?teamId=${teamId}` : '/keepers/analysis'),
+
+  // News - Sources
+  getNewsSources: () => request<any[]>('/news/sources'),
+  createNewsSource: (source: any) =>
+    request<any>('/news/sources', { method: 'POST', body: JSON.stringify(source) }),
+  updateNewsSource: (id: number, updates: any) =>
+    request<any>(`/news/sources/${id}`, { method: 'PUT', body: JSON.stringify(updates) }),
+  deleteNewsSource: (id: number) =>
+    request<any>(`/news/sources/${id}`, { method: 'DELETE' }),
+  seedDefaultSources: () =>
+    request<any>('/news/sources/seed-defaults', { method: 'POST' }),
+
+  // News - Fetch
+  fetchAllNews: () => request<any>('/news/fetch', { method: 'POST' }),
+  fetchNewsSource: (sourceId: number) =>
+    request<any>(`/news/fetch/${sourceId}`, { method: 'POST' }),
+  fetchStaleNews: () => request<any>('/news/fetch-stale', { method: 'POST' }),
+
+  // News - Articles
+  getNewsArticles: (filters: {
+    page?: number;
+    limit?: number;
+    sourceId?: number;
+    playerId?: number;
+    search?: string;
+    unreadOnly?: boolean;
+    bookmarkedOnly?: boolean;
+  } = {}) => {
+    const params = new URLSearchParams();
+    if (filters.page) params.set('page', String(filters.page));
+    if (filters.limit) params.set('limit', String(filters.limit));
+    if (filters.sourceId) params.set('sourceId', String(filters.sourceId));
+    if (filters.playerId) params.set('playerId', String(filters.playerId));
+    if (filters.search) params.set('search', filters.search);
+    if (filters.unreadOnly) params.set('unreadOnly', 'true');
+    if (filters.bookmarkedOnly) params.set('bookmarkedOnly', 'true');
+    const qs = params.toString();
+    return request<any>(`/news/articles${qs ? `?${qs}` : ''}`);
+  },
+  markArticleRead: (id: number) =>
+    request<any>(`/news/articles/${id}/read`, { method: 'PATCH' }),
+  toggleArticleBookmark: (id: number) =>
+    request<any>(`/news/articles/${id}/bookmark`, { method: 'PATCH' }),
+  markAllArticlesRead: () =>
+    request<any>('/news/articles/mark-all-read', { method: 'POST' }),
+  getPlayerNews: (playerId: number) =>
+    request<any[]>(`/news/articles/player/${playerId}`),
+
+  // News - Stats
+  getNewsStats: () => request<any>('/news/stats'),
 };

@@ -1,4 +1,5 @@
 import { NavLink, Outlet } from 'react-router';
+import { useNewsStats } from '../hooks/use-news.js';
 
 const navItems = [
   { to: '/', label: 'Dashboard', icon: '◈' },
@@ -6,11 +7,15 @@ const navItems = [
   { to: '/rosters', label: 'Rosters', icon: '☰' },
   { to: '/standings', label: 'Standings', icon: '▤' },
   { to: '/keepers', label: 'Keepers', icon: '★' },
+  { to: '/news', label: 'News', icon: '◉' },
   { to: '/import', label: 'Data Import', icon: '↑' },
   { to: '/settings', label: 'Settings', icon: '⚙' },
 ];
 
 export default function Layout() {
+  const { data: newsStats } = useNewsStats();
+  const unreadCount = newsStats?.unreadCount ?? 0;
+
   return (
     <div className="flex h-screen overflow-hidden">
       {/* Sidebar */}
@@ -36,7 +41,12 @@ export default function Layout() {
               }
             >
               <span className="text-base">{item.icon}</span>
-              {item.label}
+              <span className="flex-1">{item.label}</span>
+              {item.to === '/news' && unreadCount > 0 && (
+                <span className="px-1.5 py-0.5 text-xs bg-blue-600 text-white rounded-full min-w-[20px] text-center">
+                  {unreadCount > 99 ? '99+' : unreadCount}
+                </span>
+              )}
             </NavLink>
           ))}
         </nav>

@@ -5,6 +5,7 @@ export * from './types/team.js';
 export * from './types/trade.js';
 export * from './types/projections.js';
 export * from './types/keeper.js';
+export * from './types/news.js';
 
 // Constants
 export * from './constants/categories.js';

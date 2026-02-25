@@ -7,6 +7,7 @@ import Standings from './pages/Standings.js';
 import Keepers from './pages/Keepers.js';
 import DataImport from './pages/DataImport.js';
 import Settings from './pages/Settings.js';
+import News from './pages/News.js';
 
 export default function App() {
   return (
@@ -17,6 +18,7 @@ export default function App() {
         <Route path="rosters" element={<Rosters />} />
         <Route path="standings" element={<Standings />} />
         <Route path="keepers" element={<Keepers />} />
+        <Route path="news" element={<News />} />
         <Route path="import" element={<DataImport />} />
         <Route path="settings" element={<Settings />} />
       </Route>

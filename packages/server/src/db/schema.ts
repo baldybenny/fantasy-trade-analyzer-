@@ -102,6 +102,43 @@ export const tradeHistory = sqliteTable('trade_history', {
   createdAt: text('created_at').notNull().$defaultFn(() => new Date().toISOString()),
 });
 
+export const newsSources = sqliteTable('news_sources', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  name: text('name').notNull(),
+  type: text('type').notNull().default('rss'), // rss | substack | authenticated
+  url: text('url').notNull(),
+  enabled: integer('enabled', { mode: 'boolean' }).notNull().default(true),
+  authType: text('auth_type'),
+  authCredential: text('auth_credential'),
+  scraperKey: text('scraper_key'),
+  searchQuery: text('search_query'),
+  fetchIntervalMinutes: integer('fetch_interval_minutes').notNull().default(60),
+  lastFetchedAt: text('last_fetched_at'),
+  lastFetchError: text('last_fetch_error'),
+  articleCount: integer('article_count').notNull().default(0),
+  createdAt: text('created_at').notNull().$defaultFn(() => new Date().toISOString()),
+});
+
+export const newsArticles = sqliteTable('news_articles', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  sourceId: integer('source_id').notNull().references(() => newsSources.id),
+  title: text('title').notNull(),
+  url: text('url').notNull().unique(),
+  author: text('author'),
+  excerpt: text('excerpt'),
+  publishedAt: text('published_at'),
+  fetchedAt: text('fetched_at').notNull().$defaultFn(() => new Date().toISOString()),
+  imageUrl: text('image_url'),
+  isRead: integer('is_read', { mode: 'boolean' }).notNull().default(false),
+  isBookmarked: integer('is_bookmarked', { mode: 'boolean' }).notNull().default(false),
+});
+
+export const articlePlayers = sqliteTable('article_players', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  articleId: integer('article_id').notNull().references(() => newsArticles.id, { onDelete: 'cascade' }),
+  playerId: integer('player_id').notNull().references(() => players.id, { onDelete: 'cascade' }),
+});
+
 export const statcastData = sqliteTable('statcast_data', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   playerId: integer('player_id').references(() => players.id),
