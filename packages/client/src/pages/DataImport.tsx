@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api.js';
 
 type ImportType = 'batting' | 'pitching' | 'savant' | 'roster';
-type ProjectionSource = 'steamer' | 'zips' | 'atc';
+type ProjectionSource = 'steamer' | 'zips' | 'atc' | 'thebat' | 'thebatx' | 'fangraphsdc' | 'fantasypros' | 'rotochamp';
 
 interface ImportStatus {
   type: string;
@@ -173,6 +173,67 @@ function FetchCard({
   );
 }
 
+/**
+ * Compact fetch row for dense display of many projection sources.
+ */
+function FetchRow({
+  label,
+  batKey,
+  pitKey,
+  onFetchBat,
+  onFetchPit,
+  batStatus,
+  pitStatus,
+  disabled,
+}: {
+  label: string;
+  batKey: string;
+  pitKey: string;
+  onFetchBat: () => void;
+  onFetchPit: () => void;
+  batStatus: ImportStatus | null;
+  pitStatus: ImportStatus | null;
+  disabled?: boolean;
+}) {
+  const statusDot = (s: ImportStatus | null) => (
+    <div className={`w-2 h-2 rounded-full ${
+      s?.status === 'success' ? 'bg-green-500' :
+      s?.status === 'importing' ? 'bg-yellow-500' :
+      s?.status === 'error' ? 'bg-red-500' :
+      'bg-gray-600'
+    }`} />
+  );
+
+  const btnClass = (s: ImportStatus | null) =>
+    `px-3 py-1 text-xs rounded transition-colors ${
+      s?.status === 'importing'
+        ? 'bg-gray-700 text-gray-500'
+        : 'bg-green-600 hover:bg-green-500 text-white disabled:bg-gray-700 disabled:text-gray-500'
+    }`;
+
+  return (
+    <div className="flex items-center gap-3 py-2 border-b border-gray-800 last:border-0">
+      <span className="text-sm text-gray-300 w-32 shrink-0">{label}</span>
+      <div className="flex items-center gap-2">
+        {statusDot(batStatus)}
+        <button onClick={onFetchBat} disabled={disabled || batStatus?.status === 'importing'} className={btnClass(batStatus)}>
+          {batStatus?.status === 'importing' ? 'Bat...' : 'Batting'}
+        </button>
+        {batStatus?.status === 'success' && <span className="text-xs text-green-400">{batStatus.count}</span>}
+        {batStatus?.status === 'error' && <span className="text-xs text-red-400" title={batStatus.message}>err</span>}
+      </div>
+      <div className="flex items-center gap-2">
+        {statusDot(pitStatus)}
+        <button onClick={onFetchPit} disabled={disabled || pitStatus?.status === 'importing'} className={btnClass(pitStatus)}>
+          {pitStatus?.status === 'importing' ? 'Pit...' : 'Pitching'}
+        </button>
+        {pitStatus?.status === 'success' && <span className="text-xs text-green-400">{pitStatus.count}</span>}
+        {pitStatus?.status === 'error' && <span className="text-xs text-red-400" title={pitStatus.message}>err</span>}
+      </div>
+    </div>
+  );
+}
+
 function FantraxCard() {
   const queryClient = useQueryClient();
   const [leagueId, setLeagueId] = useState('');
@@ -290,12 +351,25 @@ function FantraxCard() {
 }
 
 const FETCH_ALL_STEPS = [
+  // FanGraphs systems
   { key: 'fetch-steamer-bat', fn: () => api.fetchProjections('steamer', 'bat') },
   { key: 'fetch-steamer-pit', fn: () => api.fetchProjections('steamer', 'pit') },
   { key: 'fetch-zips-bat', fn: () => api.fetchProjections('zips', 'bat') },
   { key: 'fetch-zips-pit', fn: () => api.fetchProjections('zips', 'pit') },
   { key: 'fetch-atc-bat', fn: () => api.fetchProjections('atc', 'bat') },
   { key: 'fetch-atc-pit', fn: () => api.fetchProjections('atc', 'pit') },
+  { key: 'fetch-thebat-bat', fn: () => api.fetchProjections('thebat', 'bat') },
+  { key: 'fetch-thebat-pit', fn: () => api.fetchProjections('thebat', 'pit') },
+  { key: 'fetch-thebatx-bat', fn: () => api.fetchProjections('thebatx', 'bat') },
+  { key: 'fetch-thebatx-pit', fn: () => api.fetchProjections('thebatx', 'pit') },
+  { key: 'fetch-fangraphsdc-bat', fn: () => api.fetchProjections('fangraphsdc', 'bat') },
+  { key: 'fetch-fangraphsdc-pit', fn: () => api.fetchProjections('fangraphsdc', 'pit') },
+  // External sources
+  { key: 'fetch-fantasypros-bat', fn: () => api.fetchFantasyPros('bat') },
+  { key: 'fetch-fantasypros-pit', fn: () => api.fetchFantasyPros('pit') },
+  { key: 'fetch-rotochamp-bat', fn: () => api.fetchRotoChamp('bat') },
+  { key: 'fetch-rotochamp-pit', fn: () => api.fetchRotoChamp('pit') },
+  // Savant
   { key: 'fetch-savant', fn: () => api.fetchSavant() },
 ] as const;
 
@@ -410,20 +484,24 @@ export default function DataImport() {
   }, [handleFetch, recalculateValues]);
 
   const checklistItems = [
-    { key: 'fetch-steamer-bat', label: 'Steamer Batting' },
-    { key: 'fetch-steamer-pit', label: 'Steamer Pitching' },
-    { key: 'fetch-zips-bat', label: 'ZiPS Batting' },
-    { key: 'fetch-zips-pit', label: 'ZiPS Pitching' },
-    { key: 'fetch-atc-bat', label: 'ATC Batting' },
-    { key: 'fetch-atc-pit', label: 'ATC Pitching' },
+    { key: 'fetch-steamer-bat', label: 'Steamer Bat' },
+    { key: 'fetch-steamer-pit', label: 'Steamer Pit' },
+    { key: 'fetch-zips-bat', label: 'ZiPS Bat' },
+    { key: 'fetch-zips-pit', label: 'ZiPS Pit' },
+    { key: 'fetch-atc-bat', label: 'ATC Bat' },
+    { key: 'fetch-atc-pit', label: 'ATC Pit' },
+    { key: 'fetch-thebat-bat', label: 'THE BAT Bat' },
+    { key: 'fetch-thebat-pit', label: 'THE BAT Pit' },
+    { key: 'fetch-thebatx-bat', label: 'THE BAT X Bat' },
+    { key: 'fetch-thebatx-pit', label: 'THE BAT X Pit' },
+    { key: 'fetch-fangraphsdc-bat', label: 'Depth Charts Bat' },
+    { key: 'fetch-fangraphsdc-pit', label: 'Depth Charts Pit' },
+    { key: 'fetch-fantasypros-bat', label: 'FPros Bat' },
+    { key: 'fetch-fantasypros-pit', label: 'FPros Pit' },
+    { key: 'fetch-rotochamp-bat', label: 'RotoChamp Bat' },
+    { key: 'fetch-rotochamp-pit', label: 'RotoChamp Pit' },
     { key: 'fetch-savant', label: 'Savant Data' },
     { key: 'fantrax-sync', label: 'Fantrax Rosters', useFantrax: true as const },
-    // Also track CSV statuses
-    { key: 'batting-steamer', label: 'Steamer Batting (CSV)' },
-    { key: 'pitching-steamer', label: 'Steamer Pitching (CSV)' },
-    { key: 'batting-zips', label: 'ZiPS Batting (CSV)' },
-    { key: 'pitching-zips', label: 'ZiPS Pitching (CSV)' },
-    { key: 'savant-savant', label: 'Savant (CSV)' },
   ];
 
   // Only show checklist items that are either fantrax or have been attempted
@@ -483,78 +561,116 @@ export default function DataImport() {
         </div>
       )}
 
-      {/* Auto-Fetch Section */}
-      <div className="flex items-center gap-3 mb-3">
-        <h3 className="text-lg font-medium text-gray-300">Auto-Fetch Projections</h3>
-        <button
-          onClick={handleFetchAll}
-          disabled={fetchAllRunning}
-          className="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-500 disabled:bg-gray-700 disabled:text-gray-500 text-white text-sm rounded transition-colors"
-        >
-          {fetchAllRunning ? (
-            <span className="flex items-center gap-2">
-              <span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-              Fetching All...
-            </span>
-          ) : (
-            'Fetch All'
-          )}
-        </button>
+      {/* Section 1: Fetch All */}
+      <div className="bg-gray-900 border border-gray-800 rounded-lg p-4 mb-6">
+        <div className="flex items-center justify-between mb-2">
+          <h3 className="text-lg font-medium text-gray-300">Fetch All Projections</h3>
+          <button
+            onClick={handleFetchAll}
+            disabled={fetchAllRunning}
+            className="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:bg-gray-700 disabled:text-gray-500 text-white text-sm rounded transition-colors"
+          >
+            {fetchAllRunning ? (
+              <span className="flex items-center gap-2">
+                <span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                Fetching All...
+              </span>
+            ) : (
+              'Fetch All Sources'
+            )}
+          </button>
+        </div>
+        <p className="text-xs text-gray-500">
+          Sequentially fetches all projection systems (6 FanGraphs + 2 external), Savant data, then recalculates values.
+        </p>
+        {fetchAllError && (
+          <div className="text-xs text-red-400 mt-2 bg-red-900/20 border border-red-800 rounded p-2">{fetchAllError}</div>
+        )}
       </div>
-      {fetchAllError && (
-        <div className="text-xs text-red-400 mb-3 bg-red-900/20 border border-red-800 rounded p-2">{fetchAllError}</div>
-      )}
-      <div className="grid grid-cols-2 gap-4 mb-6">
-        <FetchCard
-          title="Steamer Batting"
-          description="Fetch Steamer batting projections from FanGraphs"
-          fetchKey="fetch-steamer-bat"
-          onFetch={() => handleFetch('fetch-steamer-bat', () => api.fetchProjections('steamer', 'bat'))}
-          status={statuses['fetch-steamer-bat'] ?? null}
+
+      {/* Section 2: FanGraphs Systems */}
+      <div className="bg-gray-900 border border-gray-800 rounded-lg p-4 mb-6">
+        <h3 className="text-sm font-medium text-gray-400 mb-2">FanGraphs Projection Systems</h3>
+        <FetchRow
+          label="Steamer"
+          batKey="fetch-steamer-bat" pitKey="fetch-steamer-pit"
+          onFetchBat={() => handleFetch('fetch-steamer-bat', () => api.fetchProjections('steamer', 'bat'))}
+          onFetchPit={() => handleFetch('fetch-steamer-pit', () => api.fetchProjections('steamer', 'pit'))}
+          batStatus={statuses['fetch-steamer-bat'] ?? null}
+          pitStatus={statuses['fetch-steamer-pit'] ?? null}
           disabled={fetchAllRunning}
         />
-        <FetchCard
-          title="Steamer Pitching"
-          description="Fetch Steamer pitching projections from FanGraphs"
-          fetchKey="fetch-steamer-pit"
-          onFetch={() => handleFetch('fetch-steamer-pit', () => api.fetchProjections('steamer', 'pit'))}
-          status={statuses['fetch-steamer-pit'] ?? null}
+        <FetchRow
+          label="ZiPS"
+          batKey="fetch-zips-bat" pitKey="fetch-zips-pit"
+          onFetchBat={() => handleFetch('fetch-zips-bat', () => api.fetchProjections('zips', 'bat'))}
+          onFetchPit={() => handleFetch('fetch-zips-pit', () => api.fetchProjections('zips', 'pit'))}
+          batStatus={statuses['fetch-zips-bat'] ?? null}
+          pitStatus={statuses['fetch-zips-pit'] ?? null}
           disabled={fetchAllRunning}
         />
-        <FetchCard
-          title="ZiPS Batting"
-          description="Fetch ZiPS batting projections from FanGraphs"
-          fetchKey="fetch-zips-bat"
-          onFetch={() => handleFetch('fetch-zips-bat', () => api.fetchProjections('zips', 'bat'))}
-          status={statuses['fetch-zips-bat'] ?? null}
+        <FetchRow
+          label="ATC"
+          batKey="fetch-atc-bat" pitKey="fetch-atc-pit"
+          onFetchBat={() => handleFetch('fetch-atc-bat', () => api.fetchProjections('atc', 'bat'))}
+          onFetchPit={() => handleFetch('fetch-atc-pit', () => api.fetchProjections('atc', 'pit'))}
+          batStatus={statuses['fetch-atc-bat'] ?? null}
+          pitStatus={statuses['fetch-atc-pit'] ?? null}
           disabled={fetchAllRunning}
         />
-        <FetchCard
-          title="ZiPS Pitching"
-          description="Fetch ZiPS pitching projections from FanGraphs"
-          fetchKey="fetch-zips-pit"
-          onFetch={() => handleFetch('fetch-zips-pit', () => api.fetchProjections('zips', 'pit'))}
-          status={statuses['fetch-zips-pit'] ?? null}
+        <FetchRow
+          label="THE BAT"
+          batKey="fetch-thebat-bat" pitKey="fetch-thebat-pit"
+          onFetchBat={() => handleFetch('fetch-thebat-bat', () => api.fetchProjections('thebat', 'bat'))}
+          onFetchPit={() => handleFetch('fetch-thebat-pit', () => api.fetchProjections('thebat', 'pit'))}
+          batStatus={statuses['fetch-thebat-bat'] ?? null}
+          pitStatus={statuses['fetch-thebat-pit'] ?? null}
           disabled={fetchAllRunning}
         />
-        <FetchCard
-          title="ATC Batting"
-          description="Fetch ATC batting projections from FanGraphs"
-          fetchKey="fetch-atc-bat"
-          onFetch={() => handleFetch('fetch-atc-bat', () => api.fetchProjections('atc', 'bat'))}
-          status={statuses['fetch-atc-bat'] ?? null}
+        <FetchRow
+          label="THE BAT X"
+          batKey="fetch-thebatx-bat" pitKey="fetch-thebatx-pit"
+          onFetchBat={() => handleFetch('fetch-thebatx-bat', () => api.fetchProjections('thebatx', 'bat'))}
+          onFetchPit={() => handleFetch('fetch-thebatx-pit', () => api.fetchProjections('thebatx', 'pit'))}
+          batStatus={statuses['fetch-thebatx-bat'] ?? null}
+          pitStatus={statuses['fetch-thebatx-pit'] ?? null}
           disabled={fetchAllRunning}
         />
-        <FetchCard
-          title="ATC Pitching"
-          description="Fetch ATC pitching projections from FanGraphs"
-          fetchKey="fetch-atc-pit"
-          onFetch={() => handleFetch('fetch-atc-pit', () => api.fetchProjections('atc', 'pit'))}
-          status={statuses['fetch-atc-pit'] ?? null}
+        <FetchRow
+          label="Depth Charts"
+          batKey="fetch-fangraphsdc-bat" pitKey="fetch-fangraphsdc-pit"
+          onFetchBat={() => handleFetch('fetch-fangraphsdc-bat', () => api.fetchProjections('fangraphsdc', 'bat'))}
+          onFetchPit={() => handleFetch('fetch-fangraphsdc-pit', () => api.fetchProjections('fangraphsdc', 'pit'))}
+          batStatus={statuses['fetch-fangraphsdc-bat'] ?? null}
+          pitStatus={statuses['fetch-fangraphsdc-pit'] ?? null}
           disabled={fetchAllRunning}
         />
       </div>
 
+      {/* Section 3: External Sources */}
+      <div className="bg-gray-900 border border-gray-800 rounded-lg p-4 mb-6">
+        <h3 className="text-sm font-medium text-gray-400 mb-2">External Sources</h3>
+        <FetchRow
+          label="FantasyPros"
+          batKey="fetch-fantasypros-bat" pitKey="fetch-fantasypros-pit"
+          onFetchBat={() => handleFetch('fetch-fantasypros-bat', () => api.fetchFantasyPros('bat'))}
+          onFetchPit={() => handleFetch('fetch-fantasypros-pit', () => api.fetchFantasyPros('pit'))}
+          batStatus={statuses['fetch-fantasypros-bat'] ?? null}
+          pitStatus={statuses['fetch-fantasypros-pit'] ?? null}
+          disabled={fetchAllRunning}
+        />
+        <FetchRow
+          label="RotoChamp"
+          batKey="fetch-rotochamp-bat" pitKey="fetch-rotochamp-pit"
+          onFetchBat={() => handleFetch('fetch-rotochamp-bat', () => api.fetchRotoChamp('bat'))}
+          onFetchPit={() => handleFetch('fetch-rotochamp-pit', () => api.fetchRotoChamp('pit'))}
+          batStatus={statuses['fetch-rotochamp-bat'] ?? null}
+          pitStatus={statuses['fetch-rotochamp-pit'] ?? null}
+          disabled={fetchAllRunning}
+        />
+      </div>
+
+      {/* Section 4: Savant + Fantrax */}
       <div className="grid grid-cols-2 gap-4 mb-6">
         <FetchCard
           title="Baseball Savant"
@@ -570,41 +686,21 @@ export default function DataImport() {
       <h3 className="text-lg font-medium text-gray-300 mb-3">Manual CSV Import</h3>
       <div className="grid grid-cols-2 gap-4 mb-6">
         <ImportCard
-          title="Steamer Batting"
-          description="FanGraphs Steamer batting projections CSV"
+          title="Batting Projections"
+          description="Any FanGraphs batting projections CSV (select source in filename)"
           importType="batting"
           source="steamer"
           onImport={handleImport}
           status={statuses['batting-steamer'] ?? null}
         />
         <ImportCard
-          title="Steamer Pitching"
-          description="FanGraphs Steamer pitching projections CSV"
+          title="Pitching Projections"
+          description="Any FanGraphs pitching projections CSV"
           importType="pitching"
           source="steamer"
           onImport={handleImport}
           status={statuses['pitching-steamer'] ?? null}
         />
-        <ImportCard
-          title="ZiPS Batting"
-          description="FanGraphs ZiPS batting projections CSV"
-          importType="batting"
-          source="zips"
-          onImport={handleImport}
-          status={statuses['batting-zips'] ?? null}
-        />
-        <ImportCard
-          title="ZiPS Pitching"
-          description="FanGraphs ZiPS pitching projections CSV"
-          importType="pitching"
-          source="zips"
-          onImport={handleImport}
-          status={statuses['pitching-zips'] ?? null}
-        />
-      </div>
-
-      <h3 className="text-lg font-medium text-gray-300 mb-3">Other Data (CSV)</h3>
-      <div className="grid grid-cols-2 gap-4">
         <ImportCard
           title="Baseball Savant"
           description="Statcast expected stats and batted ball data"

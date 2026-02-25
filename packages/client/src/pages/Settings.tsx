@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api.js';
 import type { LeagueSettings, CategoryConfig } from '@fta/shared';
-import { DEFAULT_LEAGUE_SETTINGS } from '@fta/shared';
+import { DEFAULT_LEAGUE_SETTINGS, DEFAULT_PROJECTION_WEIGHTS } from '@fta/shared';
 
 function CategoryEditor({
   categories,
@@ -232,6 +232,45 @@ export default function Settings() {
           >
             {recalcMutation.isPending ? 'Recalculating...' : 'Recalculate All Values'}
           </button>
+        </div>
+
+        {/* Projection Weights */}
+        <div className="bg-gray-900 border border-gray-800 rounded-lg p-4">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-medium text-gray-400">Projection Source Weights</h3>
+            <button
+              onClick={() => setSettings({ ...settings, projectionWeights: { ...DEFAULT_PROJECTION_WEIGHTS } })}
+              className="text-xs text-blue-400 hover:text-blue-300"
+            >
+              Reset to Defaults
+            </button>
+          </div>
+          <p className="text-xs text-gray-500 mb-3">
+            Weights control how much each projection system contributes to the composite projection.
+            Only sources with imported data will be used; weights are re-normalized automatically.
+          </p>
+          <div className="grid grid-cols-3 gap-3">
+            {Object.entries(settings.projectionWeights ?? DEFAULT_PROJECTION_WEIGHTS).map(([source, weight]) => (
+              <div key={source} className="flex items-center gap-2">
+                <label className="text-xs text-gray-400 w-24 shrink-0">{source}</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  max="1"
+                  value={weight}
+                  onChange={(e) => {
+                    const currentWeights = settings.projectionWeights ?? { ...DEFAULT_PROJECTION_WEIGHTS };
+                    setSettings({
+                      ...settings,
+                      projectionWeights: { ...currentWeights, [source]: Number(e.target.value) },
+                    });
+                  }}
+                  className="w-20 px-2 py-1 bg-gray-800 border border-gray-700 rounded text-sm text-gray-200"
+                />
+              </div>
+            ))}
+          </div>
         </div>
 
         {/* Keeper settings */}

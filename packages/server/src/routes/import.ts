@@ -9,6 +9,7 @@ import {
   importFanTraxRoster,
 } from '../importers/index.js';
 import type { ProjectionSource, ProjectionRecord } from '@fta/shared';
+import { normalizeName, namesMatch } from '@fta/shared';
 import {
   fetchFanGraphsProjections,
   transformFanGraphsBatting,
@@ -17,6 +18,8 @@ import {
   type FanGraphsTransformResult,
 } from '../services/fangraphs-fetcher.js';
 import { fetchSavantData } from '../services/savant-fetcher.js';
+import { fetchFantasyProsBatting, fetchFantasyProsPitching } from '../services/fantasypros-fetcher.js';
+import { fetchRotoChampBatting, fetchRotoChampPitching } from '../services/rotochamp-fetcher.js';
 import type { StatcastRecord } from '../importers/index.js';
 
 const router = Router();
@@ -32,6 +35,30 @@ async function findPlayerByName(name: string) {
     .where(eq(schema.players.name, name))
     .limit(1);
   return rows[0] ?? null;
+}
+
+/**
+ * Enhanced player lookup: MLBAM ID → exact name → normalized fuzzy name.
+ */
+async function findPlayer(name: string, mlbamId?: number) {
+  // 1. MLBAM ID lookup (most reliable)
+  if (mlbamId) {
+    const rows = await db
+      .select()
+      .from(schema.players)
+      .where(eq(schema.players.mlbamId, mlbamId))
+      .limit(1);
+    if (rows[0]) return rows[0];
+  }
+
+  // 2. Exact name match
+  const exact = await findPlayerByName(name);
+  if (exact) return exact;
+
+  // 3. Normalized fuzzy name match
+  const allPlayers = await db.select().from(schema.players);
+  const match = allPlayers.find((p) => namesMatch(p.name, name));
+  return match ?? null;
 }
 
 async function createPlayer(name: string, team: string, positions: string[]) {
@@ -58,7 +85,7 @@ export async function upsertBattingProjections(
   let playersCreated = 0;
 
   for (const record of records) {
-    let player = await findPlayerByName(record.playerName);
+    let player = await findPlayer(record.playerName, record.mlbamId);
     const pos = record.position ? record.position.split('/').filter(Boolean) : [];
     if (!player) {
       player = await createPlayer(record.playerName, record.team ?? '', pos);
@@ -72,6 +99,13 @@ export async function upsertBattingProjections(
           team: record.team || player.team,
         }).where(eq(schema.players.id, player.id));
       }
+    }
+
+    // Store MLBAM ID if available and not yet set
+    if (record.mlbamId && !player.mlbamId) {
+      await db.update(schema.players)
+        .set({ mlbamId: record.mlbamId })
+        .where(eq(schema.players.id, player.id));
     }
 
     const existing = await db
@@ -147,7 +181,7 @@ export async function upsertPitchingProjections(
   let playersCreated = 0;
 
   for (const record of records) {
-    let player = await findPlayerByName(record.playerName);
+    let player = await findPlayer(record.playerName, record.mlbamId);
     const pos = record.position ? record.position.split('/').filter(Boolean) : ['SP'];
     if (!player) {
       player = await createPlayer(record.playerName, record.team ?? '', pos);
@@ -161,6 +195,13 @@ export async function upsertPitchingProjections(
           team: record.team || player.team,
         }).where(eq(schema.players.id, player.id));
       }
+    }
+
+    // Store MLBAM ID if available and not yet set
+    if (record.mlbamId && !player.mlbamId) {
+      await db.update(schema.players)
+        .set({ mlbamId: record.mlbamId })
+        .where(eq(schema.players.id, player.id));
     }
 
     const existing = await db
@@ -343,8 +384,9 @@ router.post('/import/fetch-projections', async (req, res) => {
       statType?: string;
     };
 
-    if (!system || !['steamer', 'zips', 'atc'].includes(system)) {
-      return res.status(400).json({ error: 'system must be steamer, zips, or atc' });
+    const fangraphsSystems = ['steamer', 'zips', 'atc', 'thebat', 'thebatx', 'fangraphsdc'];
+    if (!system || !fangraphsSystems.includes(system)) {
+      return res.status(400).json({ error: `system must be one of: ${fangraphsSystems.join(', ')}` });
     }
     if (!statType || !['bat', 'pit'].includes(statType)) {
       return res.status(400).json({ error: 'statType must be bat or pit' });
@@ -404,6 +446,76 @@ router.post('/import/fetch-savant', async (req, res) => {
   } catch (error) {
     console.error('Error fetching Savant data:', error);
     res.status(500).json({ error: `Failed to fetch Savant data: ${(error as Error).message}` });
+  }
+});
+
+/**
+ * POST /import/fetch-fantasypros
+ * Body: { statType: 'bat'|'pit' }
+ */
+router.post('/import/fetch-fantasypros', async (req, res) => {
+  try {
+    const { statType } = req.body as { statType?: string };
+    if (!statType || !['bat', 'pit'].includes(statType)) {
+      return res.status(400).json({ error: 'statType must be bat or pit' });
+    }
+
+    const source: ProjectionSource = 'fantasypros';
+    let result: { imported: number; playersCreated: number };
+
+    if (statType === 'bat') {
+      const records = await fetchFantasyProsBatting();
+      result = await upsertBattingProjections(records, source);
+    } else {
+      const records = await fetchFantasyProsPitching();
+      result = await upsertPitchingProjections(records, source);
+    }
+
+    res.json({
+      success: true,
+      type: statType === 'bat' ? 'batting' : 'pitching',
+      source,
+      imported: result.imported,
+      playersCreated: result.playersCreated,
+    });
+  } catch (error) {
+    console.error('Error fetching FantasyPros data:', error);
+    res.status(500).json({ error: `Failed to fetch FantasyPros data: ${(error as Error).message}` });
+  }
+});
+
+/**
+ * POST /import/fetch-rotochamp
+ * Body: { statType: 'bat'|'pit' }
+ */
+router.post('/import/fetch-rotochamp', async (req, res) => {
+  try {
+    const { statType } = req.body as { statType?: string };
+    if (!statType || !['bat', 'pit'].includes(statType)) {
+      return res.status(400).json({ error: 'statType must be bat or pit' });
+    }
+
+    const source: ProjectionSource = 'rotochamp';
+    let result: { imported: number; playersCreated: number };
+
+    if (statType === 'bat') {
+      const records = await fetchRotoChampBatting();
+      result = await upsertBattingProjections(records, source);
+    } else {
+      const records = await fetchRotoChampPitching();
+      result = await upsertPitchingProjections(records, source);
+    }
+
+    res.json({
+      success: true,
+      type: statType === 'bat' ? 'batting' : 'pitching',
+      source,
+      imported: result.imported,
+      playersCreated: result.playersCreated,
+    });
+  } catch (error) {
+    console.error('Error fetching RotoChamp data:', error);
+    res.status(500).json({ error: `Failed to fetch RotoChamp data: ${(error as Error).message}` });
   }
 });
 

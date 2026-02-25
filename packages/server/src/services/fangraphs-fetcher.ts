@@ -72,6 +72,7 @@ export async function fetchFanGraphsProjections(
 export interface FanGraphsTransformResult extends Omit<ProjectionRecord, 'id' | 'playerId'> {
   position?: string;
   team?: string;
+  mlbamId?: number;
 }
 
 export function transformFanGraphsBatting(
@@ -86,6 +87,7 @@ export function transformFanGraphsBatting(
       isPitcher: false,
       position: (r.minpos as string | undefined) ?? undefined,
       team: (r.Team as string | undefined) ?? undefined,
+      mlbamId: r.xMLBAMID ? Number(r.xMLBAMID) : undefined,
       pa: Number(r.PA) || 0,
       ab: Number(r.AB) || 0,
       hits: Number(r.H) || 0,
@@ -126,6 +128,7 @@ export function transformFanGraphsPitching(
       isPitcher: true,
       position: (Number(r.SV) || 0) >= 5 ? 'RP' : 'SP',
       team: (r.Team as string | undefined) ?? undefined,
+      mlbamId: r.xMLBAMID ? Number(r.xMLBAMID) : undefined,
       // Zero out hitting
       pa: 0,
       ab: 0,

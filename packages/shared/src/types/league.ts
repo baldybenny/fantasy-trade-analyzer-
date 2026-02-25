@@ -31,6 +31,9 @@ export interface LeagueSettings {
   positionSlots: Record<string, number>;
   replacementLevel: Record<string, number>;
   sgpMultipliers: Record<string, number>;
+
+  // Projection source weights (optional; falls back to DEFAULT_PROJECTION_WEIGHTS)
+  projectionWeights?: Record<string, number>;
 }
 
 export function getAllCategories(settings: LeagueSettings): CategoryConfig[] {
@@ -73,4 +76,5 @@ export const LeagueSettingsSchema = z.object({
   positionSlots: z.record(z.string(), z.number()),
   replacementLevel: z.record(z.string(), z.number()),
   sgpMultipliers: z.record(z.string(), z.number()),
+  projectionWeights: z.record(z.string(), z.number()).optional(),
 });

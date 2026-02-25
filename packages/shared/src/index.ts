@@ -13,3 +13,4 @@ export * from './constants/defaults.js';
 
 // Utilities
 export * from './utils/stats.js';
+export * from './utils/name-matching.js';

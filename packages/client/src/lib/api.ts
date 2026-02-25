@@ -49,6 +49,18 @@ export const api = {
       body: JSON.stringify({ year }),
     }),
 
+  fetchFantasyPros: (statType: string) =>
+    request<any>('/projections/import/fetch-fantasypros', {
+      method: 'POST',
+      body: JSON.stringify({ statType }),
+    }),
+
+  fetchRotoChamp: (statType: string) =>
+    request<any>('/projections/import/fetch-rotochamp', {
+      method: 'POST',
+      body: JSON.stringify({ statType }),
+    }),
+
   // Standings
   getStandings: () => request<any>('/standings'),
 

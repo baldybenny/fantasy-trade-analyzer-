@@ -1,4 +1,13 @@
-export type ProjectionSource = 'steamer' | 'zips' | 'atc' | 'manual';
+export type ProjectionSource =
+  | 'steamer'
+  | 'zips'
+  | 'atc'
+  | 'thebat'
+  | 'thebatx'
+  | 'fangraphsdc'
+  | 'fantasypros'
+  | 'rotochamp'
+  | 'manual';
 
 export interface ProjectionRecord {
   id?: number;
@@ -39,8 +48,13 @@ export interface CompositeProjection extends ProjectionRecord {
 }
 
 export const DEFAULT_PROJECTION_WEIGHTS: Record<ProjectionSource, number> = {
-  steamer: 0.40,
-  zips: 0.35,
-  atc: 0.25,
+  steamer: 0.18,
+  zips: 0.18,
+  thebatx: 0.16,
+  thebat: 0.14,
+  fangraphsdc: 0.12,
+  atc: 0.10,
+  fantasypros: 0.07,
+  rotochamp: 0.05,
   manual: 0,
 };

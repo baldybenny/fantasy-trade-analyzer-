@@ -3,8 +3,8 @@ import { eq, sql } from 'drizzle-orm';
 import { db } from '../db/database.js';
 import * as schema from '../db/schema.js';
 import { calculateAuctionValues } from '../services/auction-values.js';
-import type { LeagueSettings } from '@fta/shared';
-import { DEFAULT_LEAGUE_SETTINGS } from '@fta/shared';
+import type { LeagueSettings, ProjectionSource } from '@fta/shared';
+import { DEFAULT_LEAGUE_SETTINGS, DEFAULT_PROJECTION_WEIGHTS } from '@fta/shared';
 import { dbRowToPlayer } from '../db/helpers.js';
 
 const router = Router();
@@ -56,45 +56,86 @@ router.post('/calculate', async (_req, res) => {
       }
     }
 
-    // Attach projections as rosProjection on each player (and persist to DB)
-    for (const player of players) {
-      const projs = projectionsByPlayer[player.id];
-      if (projs && projs.length > 0 && !player.rosProjection) {
-        // Use the first available projection source as ROS projection
-        const p = projs[0];
-        const stats = {
-          games: 0, pa: p.pa ?? 0, ab: p.ab ?? 0, runs: p.runs ?? 0,
-          hits: p.hits ?? 0, doubles: p.doubles ?? 0, triples: p.triples ?? 0,
-          hr: p.hr ?? 0, rbi: p.rbi ?? 0, sb: p.sb ?? 0, cs: p.cs ?? 0,
-          bb: p.bb ?? 0, so: p.so ?? 0,
-          ip: p.ip ?? 0, wins: p.wins ?? 0, losses: p.losses ?? 0,
-          saves: p.saves ?? 0, holds: 0, qs: p.qs ?? 0, er: p.er ?? 0,
-          hitsAllowed: p.hitsAllowed ?? 0, bbAllowed: p.bbAllowed ?? 0,
-          strikeouts: p.strikeouts ?? 0,
-        };
-        player.rosProjection = stats;
-        // Persist to DB for future use
-        await db
-          .update(schema.players)
-          .set({ rosProjection: JSON.stringify(stats), updatedAt: new Date().toISOString() })
-          .where(eq(schema.players.id, player.id));
-      }
-    }
-
-    // Load league settings for the calculator
+    // Load league settings for the calculator (needed for projection weights)
     const settingsRows = await db.select().from(schema.leagueSettings);
     const settingsMap: Record<string, string> = {};
     for (const row of settingsRows) {
       settingsMap[row.key] = row.value;
     }
 
-    // Build a proper LeagueSettings from stored key-value pairs
     const settings: LeagueSettings = { ...DEFAULT_LEAGUE_SETTINGS };
     for (const [key, val] of Object.entries(settingsMap)) {
       try {
         (settings as any)[key] = JSON.parse(val);
       } catch {
         (settings as any)[key] = val;
+      }
+    }
+
+    // Build weighted composite projection for each player
+    const weights: Record<string, number> = settings.projectionWeights ?? { ...DEFAULT_PROJECTION_WEIGHTS };
+
+    for (const player of players) {
+      const projs = projectionsByPlayer[player.id];
+      if (projs && projs.length > 0) {
+        // Calculate total weight of available sources for this player
+        let totalWeight = 0;
+        for (const p of projs) {
+          totalWeight += weights[p.source] ?? 0;
+        }
+
+        // Fall back to equal weighting if no configured weights match
+        if (totalWeight === 0) {
+          totalWeight = projs.length;
+          for (const p of projs) {
+            (p as any)._weight = 1;
+          }
+        } else {
+          for (const p of projs) {
+            (p as any)._weight = weights[p.source] ?? 0;
+          }
+        }
+
+        // Weighted average across all available projection sources
+        const stats = {
+          games: 0,
+          pa: 0, ab: 0, runs: 0, hits: 0, doubles: 0, triples: 0,
+          hr: 0, rbi: 0, sb: 0, cs: 0, bb: 0, so: 0,
+          ip: 0, wins: 0, losses: 0, saves: 0, holds: 0,
+          qs: 0, er: 0, hitsAllowed: 0, bbAllowed: 0, strikeouts: 0,
+        };
+
+        for (const p of projs) {
+          const w = (p as any)._weight / totalWeight;
+          stats.pa += (p.pa ?? 0) * w;
+          stats.ab += (p.ab ?? 0) * w;
+          stats.runs += (p.runs ?? 0) * w;
+          stats.hits += (p.hits ?? 0) * w;
+          stats.doubles += (p.doubles ?? 0) * w;
+          stats.triples += (p.triples ?? 0) * w;
+          stats.hr += (p.hr ?? 0) * w;
+          stats.rbi += (p.rbi ?? 0) * w;
+          stats.sb += (p.sb ?? 0) * w;
+          stats.cs += (p.cs ?? 0) * w;
+          stats.bb += (p.bb ?? 0) * w;
+          stats.so += (p.so ?? 0) * w;
+          stats.ip += (p.ip ?? 0) * w;
+          stats.wins += (p.wins ?? 0) * w;
+          stats.losses += (p.losses ?? 0) * w;
+          stats.saves += (p.saves ?? 0) * w;
+          stats.qs += (p.qs ?? 0) * w;
+          stats.er += (p.er ?? 0) * w;
+          stats.hitsAllowed += (p.hitsAllowed ?? 0) * w;
+          stats.bbAllowed += (p.bbAllowed ?? 0) * w;
+          stats.strikeouts += (p.strikeouts ?? 0) * w;
+        }
+
+        player.rosProjection = stats;
+        // Persist to DB for future use
+        await db
+          .update(schema.players)
+          .set({ rosProjection: JSON.stringify(stats), updatedAt: new Date().toISOString() })
+          .where(eq(schema.players.id, player.id));
       }
     }
 
