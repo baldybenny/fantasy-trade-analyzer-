@@ -648,7 +648,7 @@ async function handleRosterImport(
   for (const record of result.data) {
     const fantasyTeamId = record.fantasyTeam ? teamMap[record.fantasyTeam] ?? null : null;
 
-    let player = await findPlayerByName(record.playerName);
+    let player = await findPlayer(record.playerName);
     if (!player) {
       player = await createPlayer(record.playerName, record.team, record.positions);
       playersCreated++;
@@ -665,6 +665,7 @@ async function handleRosterImport(
         rosterStatus: record.status || 'ROSTER',
         contractSalary: record.salary > 0 ? record.salary : player.contractSalary,
         contractYears: record.contractYears > 0 ? record.contractYears : player.contractYears,
+        contractStatus: record.contractStatus || player.contractStatus,
         updatedAt: new Date().toISOString(),
       })
       .where(eq(schema.players.id, player.id));

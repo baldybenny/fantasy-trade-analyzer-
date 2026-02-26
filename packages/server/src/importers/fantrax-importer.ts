@@ -1,5 +1,6 @@
 import { parseCSV, parseNumber, type ColumnMapping, type ParseResult } from './csv-parser.js';
 import { Position, RosterStatus } from '@fta/shared';
+import { parseContractYears } from '../services/fantrax-api.js';
 
 export interface FanTraxRosterRecord {
   playerName: string;
@@ -8,6 +9,7 @@ export interface FanTraxRosterRecord {
   positions: Position[];
   salary: number;
   contractYears: number;
+  contractStatus: string;
   owner: string;
   fantasyTeam: string;
 }
@@ -53,13 +55,15 @@ export function importFanTraxRoster(csvContent: string): ParseResult<FanTraxRost
     const name = row.player;
     if (!name) return null;
 
+    const contractRaw = (row.contract ?? '').trim();
     return {
       playerName: name,
       status: row.status ?? '',
       team: row.team ?? '',
       positions: parsePositions(row.position),
       salary: parseNumber(row.salary),
-      contractYears: parseNumber(row.contract) || 1,
+      contractYears: parseContractYears(contractRaw),
+      contractStatus: contractRaw,
       owner: row.owner ?? '',
       fantasyTeam: row.owner ?? '',
     };

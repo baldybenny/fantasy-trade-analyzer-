@@ -345,19 +345,22 @@ export function parseRosterRow(row: FantraxRosterRow): ParsedFantraxPlayer {
 
 /**
  * Parse contract year string (e.g. "1st", "2nd", "2026") into years remaining.
+ *
+ * Contract status rules:
+ *   "1st" = first year of 2-year initial contract → 2 years remaining
+ *   "2nd" = extension-eligible, decision time → 1 year remaining
+ *   "3rd" = expiring, last year → 1 year remaining
+ *   "2026" = guaranteed through that year → computed from current year
  */
 export function parseContractYears(contractYear: string): number {
   if (!contractYear) return 1;
   const trimmed = contractYear.trim().toLowerCase();
 
-  // "1st" = first year of contract = 1 year remaining (default)
-  // "2nd" = second year = 1 year remaining (already extended once)
-  // "2026" = specific year
-  if (trimmed.includes('1st')) return 1;
-  if (trimmed.includes('2nd')) return 1;
-  if (trimmed.includes('3rd')) return 1;
+  if (trimmed.includes('1st')) return 2; // first year of 2-year initial contract
+  if (trimmed.includes('2nd')) return 1; // extension-eligible
+  if (trimmed.includes('3rd')) return 1; // expiring
 
-  // If it's a year like "2026", it might mean the contract runs through that year
+  // If it's a year like "2026", contract runs through that year
   const yearMatch = trimmed.match(/^(\d{4})$/);
   if (yearMatch) {
     const contractEndYear = parseInt(yearMatch[1]);

@@ -87,10 +87,29 @@ export function applyInflation(baseValue: number, inflationRate: number): number
 }
 
 /**
+ * Can this player be extended, or are they expiring / on a guaranteed-year deal?
+ *
+ *   "1st" / "2nd" → extension-eligible (regular contract cycle)
+ *   "3rd"         → expiring, no extension possible
+ *   "2026" etc.   → guaranteed through that year, no extension cycle
+ *   ""            → assume extensible (legacy data)
+ */
+function canExtend(contract: Player['contract']): boolean {
+  const status = contract?.contractStatus ?? '';
+  if (!status) return true; // legacy data without status
+  if (/^\d{4}$/.test(status)) return false; // guaranteed-year deal
+  if (status.toLowerCase().includes('3rd')) return false; // expiring
+  return true;
+}
+
+/**
  * Project keeper value over multiple future years.
  *
- * Value decays 5% per year. Salary grows by extensionCostPerYear after
- * the initial contract expires.
+ * Value decays 5% per year. Extension cost is $5 per year of extension,
+ * added all at once (e.g. 1-year ext = +$5, 2-year ext = +$10).
+ *
+ * Players on guaranteed-year contracts or in their 3rd (expiring) year
+ * cannot be extended — projection stops after their contract expires.
  */
 export function projectKeeperValue(
   player: Player,
@@ -101,17 +120,22 @@ export function projectKeeperValue(
   const baseSalary = player.contract?.salary ?? 0;
   const baseValue = player.auctionValue ?? 0;
   const contractYears = player.contract?.yearsRemaining ?? 1;
+  const extensible = canExtend(player.contract);
 
   for (let year = 1; year <= yearsForward; year++) {
+    // If contract expired and player can't extend, stop projecting
+    if (year > contractYears && !extensible) break;
+
     const projectedValue = Math.round(baseValue * Math.pow(0.95, year) * 10) / 10;
 
-    // Extension cost is a flat $5 bump added all at once when extending,
-    // not per year. E.g. $1 salary + $5 extension = $6 for all extension years.
     let projectedSalary: number;
     if (year <= contractYears) {
       projectedSalary = baseSalary;
     } else {
-      projectedSalary = baseSalary + settings.extensionCostPerYear;
+      // Each year of extension costs $5 added to base salary all at once.
+      // Year-by-year extensions: year 1 past contract = +$5, year 2 = +$10, etc.
+      const extensions = year - contractYears;
+      projectedSalary = baseSalary + settings.extensionCostPerYear * extensions;
     }
 
     const surplusValue = Math.round((projectedValue - projectedSalary) * 10) / 10;

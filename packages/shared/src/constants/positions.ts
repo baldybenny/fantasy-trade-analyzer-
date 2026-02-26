@@ -40,16 +40,16 @@ export const DEFAULT_REPLACEMENT_LEVEL: Record<string, number> = {
 };
 
 export const DEFAULT_SGP_MULTIPLIERS: Record<string, number> = {
-  R: 25,
-  HR: 8,
-  RBI: 25,
-  SB: 10,
-  AVG: 0.003,
-  OPS: 0.008,
-  W: 3,
-  QS: 5,
-  SV: 8,
-  K: 30,
-  ERA: 0.15,
-  WHIP: 0.015,
+  R: 19.2,
+  HR: 9,
+  RBI: 20.6,
+  SB: 8,
+  AVG: 0.0017,
+  OPS: 0.006,
+  W: 2.5,
+  QS: 2.9,
+  SV: 4.4,
+  K: 22.1,
+  ERA: 0.08,
+  WHIP: 0.0155,
 };

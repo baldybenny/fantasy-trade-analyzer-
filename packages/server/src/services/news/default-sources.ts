@@ -27,24 +27,9 @@ export const DEFAULT_NEWS_SOURCES: DefaultSource[] = [
     url: 'https://www.mlb.com/feeds/news/rss.xml',
     fetchIntervalMinutes: 30,
   },
-  {
-    name: 'RotoWorld / NBC Sports',
-    type: 'rss',
-    url: 'https://www.nbcsportsedge.com/baseball/news/rss',
-    fetchIntervalMinutes: 60,
-  },
-  {
-    name: 'RotoWire',
-    type: 'rss',
-    url: 'https://www.rotowire.com/baseball/news.php?view=rss',
-    fetchIntervalMinutes: 60,
-  },
-  {
-    name: 'Imaginary Brick Wall',
-    type: 'substack',
-    url: 'https://imaginarybrickwall.substack.com/feed',
-    fetchIntervalMinutes: 120,
-  },
+  // RotoWorld / NBC Sports — removed, SSL errors (site discontinued RSS)
+  // RotoWire — removed, returns HTML instead of RSS (feed discontinued)
+  // Imaginary Brick Wall — removed, Substack feed returns 404
   {
     name: 'Google News — Fantasy Baseball',
     type: 'google-news',

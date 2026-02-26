@@ -202,6 +202,7 @@ router.post('/sync', async (_req, res) => {
 
           const parsed = parseRosterRow(row);
           const contractYears = parseContractYears(parsed.contractYear);
+          const contractStatus = parsed.contractYear.trim();
 
           // Find existing player by name
           const existing = await db
@@ -220,6 +221,7 @@ router.post('/sync', async (_req, res) => {
               rosterStatus: parsed.rosterStatus,
               contractSalary: parsed.salary > 0 ? parsed.salary : null,
               contractYears,
+              contractStatus: contractStatus || null,
               updatedAt: new Date().toISOString(),
             });
             playersCreated++;
@@ -237,6 +239,7 @@ router.post('/sync', async (_req, res) => {
                 rosterStatus: parsed.rosterStatus,
                 contractSalary: parsed.salary > 0 ? parsed.salary : player.contractSalary,
                 contractYears,
+                contractStatus: contractStatus || player.contractStatus,
                 updatedAt: new Date().toISOString(),
               })
               .where(eq(schema.players.id, player.id));
