@@ -52,12 +52,16 @@ export async function fetchFanGraphsProjections(
 ): Promise<Record<string, any>[]> {
   const url = `https://www.fangraphs.com/api/projections?type=${system}&stats=${statType}&pos=all&team=0&players=0&lg=all`;
 
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 60_000);
   const res = await fetch(url, {
     headers: {
       'User-Agent': 'FantasyTradeAnalyzer/1.0',
       'Accept': 'application/json',
     },
+    signal: controller.signal,
   });
+  clearTimeout(timeout);
 
   if (!res.ok) {
     throw new Error(`FanGraphs API error: ${res.status} ${res.statusText}`);

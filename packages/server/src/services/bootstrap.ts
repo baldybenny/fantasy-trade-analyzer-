@@ -19,11 +19,8 @@ export async function bootstrap(port: string | number): Promise<void> {
   }
 
   // 2. Read env vars
-  const envKeys = Object.keys(process.env).filter((k) => !k.startsWith('npm_')).sort();
-  console.log(`[Bootstrap] Env vars available: ${envKeys.join(', ')}`);
   const leagueId = process.env.FANTRAX_LEAGUE_ID;
   const cookie = process.env.FANTRAX_COOKIE;
-  console.log(`[Bootstrap] FANTRAX_LEAGUE_ID=${leagueId ? 'set' : 'missing'}, FANTRAX_COOKIE=${cookie ? 'set' : 'missing'}`);
   if (!leagueId || !cookie) {
     console.log('[Bootstrap] FANTRAX_LEAGUE_ID or FANTRAX_COOKIE not set — skipping');
     return;
@@ -31,18 +28,25 @@ export async function bootstrap(port: string | number): Promise<void> {
 
   console.log('[Bootstrap] Empty DB detected — starting full sync...');
 
-  // Helper for POST requests to our own server
+  // Helper for POST requests to our own server (2 minute timeout)
   async function post(path: string, body: Record<string, unknown> = {}): Promise<Record<string, any>> {
-    const res = await fetch(`${base}${path}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
-    if (!res.ok) {
-      const text = await res.text();
-      throw new Error(`POST ${path} failed (${res.status}): ${text}`);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 120_000);
+    try {
+      const res = await fetch(`${base}${path}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+        signal: controller.signal,
+      });
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(`POST ${path} failed (${res.status}): ${text}`);
+      }
+      return res.json() as Promise<Record<string, any>>;
+    } finally {
+      clearTimeout(timeout);
     }
-    return res.json() as Promise<Record<string, any>>;
   }
 
   // 3. Save Fantrax config
