@@ -21,6 +21,7 @@ export async function fetchSavantData(year?: number): Promise<string> {
       'User-Agent': 'FantasyTradeAnalyzer/1.0',
       'Accept': 'text/csv',
     },
+    signal: AbortSignal.timeout(30_000),
   });
 
   if (!res.ok) {

@@ -138,6 +138,7 @@ export class FantraxClient {
         Cookie: `FX_RM=${this.cookie}`,
       },
       body: JSON.stringify({ msgs }),
+      signal: AbortSignal.timeout(30_000),
     });
 
     if (!response.ok) {

@@ -45,7 +45,7 @@ function col(cells: ReturnType<cheerio.CheerioAPI>, map: Record<string, number>,
  * Fetch and parse RotoChamp batting projections.
  */
 export async function fetchRotoChampBatting(): Promise<FanGraphsTransformResult[]> {
-  const res = await fetch(BATTING_URL, { headers: HEADERS });
+  const res = await fetch(BATTING_URL, { headers: HEADERS, signal: AbortSignal.timeout(30_000) });
   if (!res.ok) {
     throw new Error(`RotoChamp batting fetch failed: ${res.status} ${res.statusText}`);
   }
@@ -129,7 +129,7 @@ export async function fetchRotoChampBatting(): Promise<FanGraphsTransformResult[
  * Fetch and parse RotoChamp pitching projections.
  */
 export async function fetchRotoChampPitching(): Promise<FanGraphsTransformResult[]> {
-  const res = await fetch(PITCHING_URL, { headers: HEADERS });
+  const res = await fetch(PITCHING_URL, { headers: HEADERS, signal: AbortSignal.timeout(30_000) });
   if (!res.ok) {
     throw new Error(`RotoChamp pitching fetch failed: ${res.status} ${res.statusText}`);
   }

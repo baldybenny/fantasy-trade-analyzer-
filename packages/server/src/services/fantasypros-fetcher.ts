@@ -46,7 +46,7 @@ function col(cells: ReturnType<cheerio.CheerioAPI>, map: Record<string, number>,
  * Fetch and parse FantasyPros batting projections.
  */
 export async function fetchFantasyProsBatting(): Promise<FanGraphsTransformResult[]> {
-  const res = await fetch(BATTING_URL, { headers: HEADERS });
+  const res = await fetch(BATTING_URL, { headers: HEADERS, signal: AbortSignal.timeout(30_000) });
   if (!res.ok) {
     throw new Error(`FantasyPros batting fetch failed: ${res.status} ${res.statusText}`);
   }
@@ -131,7 +131,7 @@ export async function fetchFantasyProsBatting(): Promise<FanGraphsTransformResul
  * Fetch and parse FantasyPros pitching projections.
  */
 export async function fetchFantasyProsPitching(): Promise<FanGraphsTransformResult[]> {
-  const res = await fetch(PITCHING_URL, { headers: HEADERS });
+  const res = await fetch(PITCHING_URL, { headers: HEADERS, signal: AbortSignal.timeout(30_000) });
   if (!res.ok) {
     throw new Error(`FantasyPros pitching fetch failed: ${res.status} ${res.statusText}`);
   }
