@@ -1,9 +1,25 @@
 import { db } from '../db/database.js';
 import * as schema from '../db/schema.js';
+import {
+  fetchFanGraphsProjections,
+  transformFanGraphsBatting,
+  transformFanGraphsPitching,
+} from './fangraphs-fetcher.js';
+import { fetchFantasyProsBatting, fetchFantasyProsPitching } from './fantasypros-fetcher.js';
+import { fetchRotoChampBatting, fetchRotoChampPitching } from './rotochamp-fetcher.js';
+import { fetchSavantData } from './savant-fetcher.js';
+import { importSavant } from '../importers/index.js';
+import {
+  upsertBattingProjections,
+  upsertPitchingProjections,
+  upsertSavantData,
+} from '../routes/import.js';
+import type { ProjectionSource } from '@fta/shared';
 
 /**
- * Auto-bootstrap: if the DB is empty (no Fantrax config), sync all data
- * from scratch by hitting the server's own API endpoints.
+ * Auto-bootstrap: if the DB is empty (no Fantrax config), sync all data.
+ * Uses direct service calls for projections (non-blocking) and self-requests
+ * only for Fantrax config/sync (complex route handler logic).
  *
  * Requires env vars: FANTRAX_LEAGUE_ID, FANTRAX_COOKIE
  */
@@ -28,7 +44,7 @@ export async function bootstrap(port: string | number): Promise<void> {
 
   console.log('[Bootstrap] Empty DB detected — starting full sync...');
 
-  // Helper for POST requests to our own server (2 minute timeout)
+  // Helper for POST requests to our own server (only used for Fantrax endpoints)
   async function post(path: string, body: Record<string, unknown> = {}): Promise<Record<string, any>> {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 120_000);
@@ -59,37 +75,58 @@ export async function bootstrap(port: string | number): Promise<void> {
   const syncResult = await post('/api/fantrax/sync');
   console.log(`[Bootstrap] Rosters synced — ${syncResult.players?.total ?? 0} players`);
 
-  // 5. Fetch all projections
-  const fangraphsSystems = ['steamer', 'zips', 'atc', 'thebat', 'thebatx', 'fangraphsdc'] as const;
-  const statTypes = ['bat', 'pit'] as const;
+  // 5. Fetch all projections (direct service calls — no self-HTTP requests)
+  const fangraphsSystems: ProjectionSource[] = ['steamer', 'zips', 'atc', 'thebat', 'thebatx', 'fangraphsdc'];
 
   for (const system of fangraphsSystems) {
-    for (const statType of statTypes) {
+    for (const statType of ['bat', 'pit'] as const) {
       try {
         console.log(`[Bootstrap] Fetching FanGraphs ${system} ${statType}...`);
-        const result = await post('/api/projections/import/fetch-projections', { system, statType });
-        console.log(`[Bootstrap] ${system} ${statType}: ${result.imported} imported`);
+        const rawRows = await fetchFanGraphsProjections(system, statType);
+        if (statType === 'bat') {
+          const records = transformFanGraphsBatting(rawRows, system);
+          const result = await upsertBattingProjections(records, system);
+          console.log(`[Bootstrap] ${system} ${statType}: ${result.imported} imported`);
+        } else {
+          const records = transformFanGraphsPitching(rawRows, system);
+          const result = await upsertPitchingProjections(records, system);
+          console.log(`[Bootstrap] ${system} ${statType}: ${result.imported} imported`);
+        }
       } catch (err) {
         console.error(`[Bootstrap] ${system} ${statType} failed:`, err instanceof Error ? err.message : err);
       }
     }
   }
 
-  for (const statType of statTypes) {
+  for (const statType of ['bat', 'pit'] as const) {
     try {
       console.log(`[Bootstrap] Fetching FantasyPros ${statType}...`);
-      const result = await post('/api/projections/import/fetch-fantasypros', { statType });
-      console.log(`[Bootstrap] FantasyPros ${statType}: ${result.imported} imported`);
+      if (statType === 'bat') {
+        const records = await fetchFantasyProsBatting();
+        const result = await upsertBattingProjections(records, 'fantasypros');
+        console.log(`[Bootstrap] FantasyPros ${statType}: ${result.imported} imported`);
+      } else {
+        const records = await fetchFantasyProsPitching();
+        const result = await upsertPitchingProjections(records, 'fantasypros');
+        console.log(`[Bootstrap] FantasyPros ${statType}: ${result.imported} imported`);
+      }
     } catch (err) {
       console.error(`[Bootstrap] FantasyPros ${statType} failed:`, err instanceof Error ? err.message : err);
     }
   }
 
-  for (const statType of statTypes) {
+  for (const statType of ['bat', 'pit'] as const) {
     try {
       console.log(`[Bootstrap] Fetching RotoChamp ${statType}...`);
-      const result = await post('/api/projections/import/fetch-rotochamp', { statType });
-      console.log(`[Bootstrap] RotoChamp ${statType}: ${result.imported} imported`);
+      if (statType === 'bat') {
+        const records = await fetchRotoChampBatting();
+        const result = await upsertBattingProjections(records, 'rotochamp');
+        console.log(`[Bootstrap] RotoChamp ${statType}: ${result.imported} imported`);
+      } else {
+        const records = await fetchRotoChampPitching();
+        const result = await upsertPitchingProjections(records, 'rotochamp');
+        console.log(`[Bootstrap] RotoChamp ${statType}: ${result.imported} imported`);
+      }
     } catch (err) {
       console.error(`[Bootstrap] RotoChamp ${statType} failed:`, err instanceof Error ? err.message : err);
     }
@@ -97,17 +134,19 @@ export async function bootstrap(port: string | number): Promise<void> {
 
   try {
     console.log('[Bootstrap] Fetching Savant data...');
-    const result = await post('/api/projections/import/fetch-savant');
+    const csvContent = await fetchSavantData();
+    const parsed = importSavant(csvContent);
+    const result = await upsertSavantData(parsed.data);
     console.log(`[Bootstrap] Savant: ${result.imported} imported`);
   } catch (err) {
     console.error('[Bootstrap] Savant failed:', err instanceof Error ? err.message : err);
   }
 
-  // 6. Seed news sources
+  // 6. Seed news sources (direct DB call, no external fetch needed)
   try {
     console.log('[Bootstrap] Seeding news sources...');
-    const result = await post('/api/news/sources/seed-defaults');
-    console.log(`[Bootstrap] News sources: ${result.added} added`);
+    await post('/api/news/sources/seed-defaults');
+    console.log('[Bootstrap] News sources seeded');
   } catch (err) {
     console.error('[Bootstrap] News seed failed:', err instanceof Error ? err.message : err);
   }
@@ -115,8 +154,8 @@ export async function bootstrap(port: string | number): Promise<void> {
   // 7. Calculate auction values
   try {
     console.log('[Bootstrap] Calculating auction values...');
-    const result = await post('/api/values/calculate');
-    console.log(`[Bootstrap] Auction values: ${result.playersUpdated} players updated`);
+    await post('/api/values/calculate');
+    console.log('[Bootstrap] Auction values calculated');
   } catch (err) {
     console.error('[Bootstrap] Auction values failed:', err instanceof Error ? err.message : err);
   }
