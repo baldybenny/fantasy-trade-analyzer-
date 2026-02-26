@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import path from 'path';
+import { fileURLToPath } from 'url';
 
 export function createApp() {
   const app = express();
@@ -21,6 +22,7 @@ export function createApp() {
   });
 
   // Serve static client files in production
+  const __dirname = path.dirname(fileURLToPath(import.meta.url));
   const clientDist = path.join(__dirname, '../../client/dist');
   app.use(express.static(clientDist));
   app.get('*', (_req, res) => {
