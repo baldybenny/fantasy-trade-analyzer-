@@ -17,10 +17,12 @@ serveClient(app);
 app.listen(PORT, () => {
   console.log(`Fantasy Trade Analyzer API running on http://localhost:${PORT}`);
 
-  // Auto-bootstrap: sync all data if DB is empty
-  bootstrap(PORT).catch((err) => {
-    console.error('[Bootstrap] Fatal error:', err instanceof Error ? err.message : err);
-  });
+  // Auto-bootstrap: delay 10s so server can handle health checks and traffic first
+  setTimeout(() => {
+    bootstrap(PORT).catch((err) => {
+      console.error('[Bootstrap] Fatal error:', err instanceof Error ? err.message : err);
+    });
+  }, 10_000);
 
   // Background news polling every 15 minutes
   const POLL_INTERVAL_MS = 15 * 60 * 1000;
