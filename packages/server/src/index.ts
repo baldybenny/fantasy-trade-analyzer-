@@ -1,4 +1,5 @@
 import { createApp, serveClient } from './app.js';
+import { bootstrap } from './services/bootstrap.js';
 
 // Import and run migration on startup
 import './db/migrate.js';
@@ -15,6 +16,11 @@ serveClient(app);
 
 app.listen(PORT, () => {
   console.log(`Fantasy Trade Analyzer API running on http://localhost:${PORT}`);
+
+  // Auto-bootstrap: sync all data if DB is empty
+  bootstrap(PORT).catch((err) => {
+    console.error('[Bootstrap] Fatal error:', err instanceof Error ? err.message : err);
+  });
 
   // Background news polling every 15 minutes
   const POLL_INTERVAL_MS = 15 * 60 * 1000;
