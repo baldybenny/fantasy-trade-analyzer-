@@ -28,6 +28,7 @@ export interface KeeperCandidate {
   surplusValue: number;
   inflatedSurplus: number;
   yearsRemaining: number;
+  contractStatus: string;
   keepRecommendation: boolean;
   multiYearProjection: YearProjection[];
 }

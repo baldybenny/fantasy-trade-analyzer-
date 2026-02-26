@@ -1,8 +1,9 @@
 /**
  * FantasyPros Projection Fetcher
  *
- * Fetches projection data from FantasyPros' AJAX data endpoint.
- * Falls back to HTML table scraping if the AJAX endpoint changes.
+ * Fetches projection data from FantasyPros' HTML tables.
+ * Uses dynamic header-based column mapping (like the RotoChamp fetcher)
+ * to be resilient to column order changes.
  */
 
 import * as cheerio from 'cheerio';
@@ -20,6 +21,28 @@ const HEADERS = {
 };
 
 /**
+ * Parse a header row to build a column-name → index map.
+ */
+function buildColumnMap($: cheerio.CheerioAPI, table: ReturnType<cheerio.CheerioAPI>): Record<string, number> {
+  const map: Record<string, number> = {};
+  table.find('thead tr th, thead tr td').each((i, el) => {
+    const text = $(el).text().trim().toUpperCase();
+    map[text] = i;
+  });
+  return map;
+}
+
+function col(cells: ReturnType<cheerio.CheerioAPI>, map: Record<string, number>, ...names: string[]): string {
+  for (const name of names) {
+    const idx = map[name.toUpperCase()];
+    if (idx !== undefined) {
+      return cells.eq(idx).text().trim();
+    }
+  }
+  return '';
+}
+
+/**
  * Fetch and parse FantasyPros batting projections.
  */
 export async function fetchFantasyProsBatting(): Promise<FanGraphsTransformResult[]> {
@@ -32,45 +55,46 @@ export async function fetchFantasyProsBatting(): Promise<FanGraphsTransformResul
   const $ = cheerio.load(html);
   const results: FanGraphsTransformResult[] = [];
 
-  // FantasyPros renders stats in a table with id="data"
-  const rows = $('table#data tbody tr, table.player-table tbody tr');
+  const table = $('table#data, table.player-table');
+  if (table.length === 0) {
+    throw new Error('FantasyPros: Could not find batting projection table. Page structure may have changed.');
+  }
+
+  const colMap = buildColumnMap($, table);
+  const rows = table.find('tbody tr');
 
   rows.each((_i, row) => {
     const cells = $(row).find('td');
-    if (cells.length < 10) return;
+    if (cells.length < 8) return;
 
-    // First cell has the player name, possibly with team/position info
-    const nameCell = $(cells[0]);
+    const nameCell = cells.eq(0);
     const playerName = nameCell.find('a.player-name').text().trim()
       || nameCell.find('a').first().text().trim()
       || nameCell.text().trim().split('\n')[0].trim();
 
     if (!playerName) return;
 
-    // Extract team from small text or span
     const teamText = nameCell.find('small, .player-team').text().trim();
     const team = teamText.replace(/[()]/g, '').trim();
 
-    // Parse stats - FantasyPros typical column order:
-    // Player, AB, R, H, 2B, 3B, HR, RBI, SB, BB, SO, AVG, OBP, SLG
-    // But order can vary, so we try to match by header
-    const ab = parseFloat($(cells[1]).text()) || 0;
-    const runs = parseFloat($(cells[2]).text()) || 0;
-    const hits = parseFloat($(cells[3]).text()) || 0;
-    const doubles = parseFloat($(cells[4]).text()) || 0;
-    const triples = parseFloat($(cells[5]).text()) || 0;
-    const hr = parseFloat($(cells[6]).text()) || 0;
-    const rbi = parseFloat($(cells[7]).text()) || 0;
-    const sb = parseFloat($(cells[8]).text()) || 0;
-    const bb = parseFloat($(cells[9]).text()) || 0;
-    const so = parseFloat($(cells[10]).text()) || 0;
+    const ab = parseFloat(col(cells, colMap, 'AB')) || 0;
+    const runs = parseFloat(col(cells, colMap, 'R', 'RUNS')) || 0;
+    const hits = parseFloat(col(cells, colMap, 'H', 'HITS')) || 0;
+    const doubles = parseFloat(col(cells, colMap, '2B')) || 0;
+    const triples = parseFloat(col(cells, colMap, '3B')) || 0;
+    const hr = parseFloat(col(cells, colMap, 'HR')) || 0;
+    const rbi = parseFloat(col(cells, colMap, 'RBI')) || 0;
+    const sb = parseFloat(col(cells, colMap, 'SB')) || 0;
+    const bb = parseFloat(col(cells, colMap, 'BB')) || 0;
+    const so = parseFloat(col(cells, colMap, 'SO', 'K')) || 0;
+    const pa = parseFloat(col(cells, colMap, 'PA')) || (ab + bb);
 
     results.push({
       playerName,
       source: SOURCE,
       isPitcher: false,
       team: team || undefined,
-      pa: ab + bb, // Approximate PA from AB + BB
+      pa,
       ab,
       hits,
       doubles,
@@ -116,13 +140,19 @@ export async function fetchFantasyProsPitching(): Promise<FanGraphsTransformResu
   const $ = cheerio.load(html);
   const results: FanGraphsTransformResult[] = [];
 
-  const rows = $('table#data tbody tr, table.player-table tbody tr');
+  const table = $('table#data, table.player-table');
+  if (table.length === 0) {
+    throw new Error('FantasyPros: Could not find pitching projection table. Page structure may have changed.');
+  }
+
+  const colMap = buildColumnMap($, table);
+  const rows = table.find('tbody tr');
 
   rows.each((_i, row) => {
     const cells = $(row).find('td');
-    if (cells.length < 10) return;
+    if (cells.length < 8) return;
 
-    const nameCell = $(cells[0]);
+    const nameCell = cells.eq(0);
     const playerName = nameCell.find('a.player-name').text().trim()
       || nameCell.find('a').first().text().trim()
       || nameCell.text().trim().split('\n')[0].trim();
@@ -132,15 +162,14 @@ export async function fetchFantasyProsPitching(): Promise<FanGraphsTransformResu
     const teamText = nameCell.find('small, .player-team').text().trim();
     const team = teamText.replace(/[()]/g, '').trim();
 
-    // FantasyPros pitching columns: Player, IP, W, L, SV, ERA, WHIP, K, BB, H, ER
-    const ip = parseFloat($(cells[1]).text()) || 0;
-    const wins = parseFloat($(cells[2]).text()) || 0;
-    const losses = parseFloat($(cells[3]).text()) || 0;
-    const saves = parseFloat($(cells[4]).text()) || 0;
-    const strikeouts = parseFloat($(cells[7]).text()) || 0;
-    const bbAllowed = parseFloat($(cells[8]).text()) || 0;
-    const hitsAllowed = parseFloat($(cells[9]).text()) || 0;
-    const er = parseFloat($(cells[10]).text()) || 0;
+    const ip = parseFloat(col(cells, colMap, 'IP')) || 0;
+    const wins = parseFloat(col(cells, colMap, 'W', 'WINS')) || 0;
+    const losses = parseFloat(col(cells, colMap, 'L', 'LOSSES')) || 0;
+    const saves = parseFloat(col(cells, colMap, 'SV', 'SAVES')) || 0;
+    const strikeouts = parseFloat(col(cells, colMap, 'K', 'SO')) || 0;
+    const bbAllowed = parseFloat(col(cells, colMap, 'BB')) || 0;
+    const hitsAllowed = parseFloat(col(cells, colMap, 'H', 'HITS')) || 0;
+    const er = parseFloat(col(cells, colMap, 'ER')) || 0;
 
     results.push({
       playerName,

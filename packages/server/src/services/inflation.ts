@@ -189,6 +189,7 @@ export function analyzeKeepers(
         surplusValue,
         inflatedSurplus,
         yearsRemaining: p.contract!.yearsRemaining,
+        contractStatus: p.contract?.contractStatus ?? '',
         keepRecommendation: inflatedSurplus > 0,
         multiYearProjection,
       };

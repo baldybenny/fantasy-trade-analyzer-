@@ -333,6 +333,29 @@ export async function upsertSavantData(
 }
 
 // ---------------------------------------------------------------------------
+// DELETE projections by source
+// ---------------------------------------------------------------------------
+
+router.delete('/import/projections/:source', async (req, res) => {
+  try {
+    const source = req.params.source as ProjectionSource;
+    const deleted = await db
+      .delete(schema.projections)
+      .where(eq(schema.projections.source, source))
+      .returning();
+
+    res.json({
+      success: true,
+      source,
+      deleted: deleted.length,
+    });
+  } catch (error) {
+    console.error('Error deleting projections:', error);
+    res.status(500).json({ error: `Failed to delete projections: ${(error as Error).message}` });
+  }
+});
+
+// ---------------------------------------------------------------------------
 // CSV import endpoint (existing)
 // ---------------------------------------------------------------------------
 

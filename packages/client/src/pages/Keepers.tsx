@@ -109,7 +109,9 @@ function KeeperRow({ candidate }: { candidate: KeeperCandidate }) {
           ${candidate.inflatedSurplus.toFixed(1)}
         </td>
         <td className="py-2 px-3 text-gray-400 text-xs text-center">
-          {candidate.yearsRemaining}yr
+          {candidate.contractStatus
+            ? `${candidate.contractStatus} (${candidate.yearsRemaining}yr)`
+            : `${candidate.yearsRemaining}yr`}
         </td>
         <td className="text-center py-2 px-3">
           {candidate.keepRecommendation ? (
