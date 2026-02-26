@@ -21,6 +21,7 @@ export async function bootstrap(port: string | number): Promise<void> {
   // 2. Read env vars
   const leagueId = process.env.FANTRAX_LEAGUE_ID;
   const cookie = process.env.FANTRAX_COOKIE;
+  console.log(`[Bootstrap] FANTRAX_LEAGUE_ID=${leagueId ? 'set' : 'missing'}, FANTRAX_COOKIE=${cookie ? 'set' : 'missing'}`);
   if (!leagueId || !cookie) {
     console.log('[Bootstrap] FANTRAX_LEAGUE_ID or FANTRAX_COOKIE not set — skipping');
     return;
