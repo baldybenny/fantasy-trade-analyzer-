@@ -174,6 +174,7 @@ router.post('/calculate', async (_req, res) => {
           inflatedValue: vp.inflatedValue ?? null,
           vorp: vp.vorp ?? null,
           sgpValue: vp.sgpValue ?? null,
+          categoryValues: JSON.stringify(vp.categoryValues),
           updatedAt: new Date().toISOString(),
         })
         .where(eq(schema.players.id, vp.playerId));

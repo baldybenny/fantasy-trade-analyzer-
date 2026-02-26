@@ -36,9 +36,10 @@ function parsePlayerRow(row: typeof schema.players.$inferSelect) {
       ? {
           salary: row.contractSalary,
           yearsRemaining: row.contractYears ?? 1,
+          contractStatus: row.contractStatus ?? '',
           isKeeper: row.isKeeper ?? false,
           extensionYear: 0,
-          guaranteed: true,
+          guaranteed: /^\d{4}$/.test(row.contractStatus ?? ''),
           droppable: true,
         }
       : undefined,
@@ -47,6 +48,7 @@ function parsePlayerRow(row: typeof schema.players.$inferSelect) {
     auctionValue: row.auctionValue ?? undefined,
     vorp: row.vorp ?? undefined,
     sgpValue: row.sgpValue ?? undefined,
+    categoryValues: parseJsonSafe(row.categoryValues, undefined),
   };
 }
 

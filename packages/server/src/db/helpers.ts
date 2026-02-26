@@ -15,9 +15,10 @@ export function dbRowToPlayer(row: any): Player {
     contract: row.contractSalary != null ? {
       salary: row.contractSalary,
       yearsRemaining: row.contractYears ?? 1,
+      contractStatus: row.contractStatus ?? '',
       isKeeper: !!row.isKeeper,
       extensionYear: 0,
-      guaranteed: true,
+      guaranteed: /^\d{4}$/.test(row.contractStatus ?? ''),
       droppable: true,
     } : undefined,
     currentSeason: row.currentStats ? (typeof row.currentStats === 'string' ? JSON.parse(row.currentStats) : row.currentStats) : undefined,
@@ -26,5 +27,6 @@ export function dbRowToPlayer(row: any): Player {
     inflatedValue: row.inflatedValue ?? undefined,
     vorp: row.vorp ?? undefined,
     sgpValue: row.sgpValue ?? undefined,
+    categoryValues: row.categoryValues ? (typeof row.categoryValues === 'string' ? JSON.parse(row.categoryValues) : row.categoryValues) : undefined,
   };
 }

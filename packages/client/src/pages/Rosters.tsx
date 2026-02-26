@@ -1,9 +1,31 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../lib/api.js';
-import type { Player } from '@fta/shared';
+import type { Player, PlayerStats } from '@fta/shared';
+import { computeAvg, computeOps, computeEra, computeWhip } from '@fta/shared';
 
-function PlayerRow({ player }: { player: Player }) {
+const HITTER_CATS = ['R', 'HR', 'RBI', 'SB', 'AVG', 'OPS'] as const;
+const PITCHER_CATS = ['W', 'QS', 'SV', 'K', 'ERA', 'WHIP'] as const;
+function getProjectedStat(stats: PlayerStats | undefined, cat: string): string {
+  if (!stats) return '';
+  switch (cat) {
+    case 'R':    return Math.round(stats.runs).toString();
+    case 'HR':   return Math.round(stats.hr).toString();
+    case 'RBI':  return Math.round(stats.rbi).toString();
+    case 'SB':   return Math.round(stats.sb).toString();
+    case 'AVG':  { const v = computeAvg(stats); return v != null ? v.toFixed(3) : ''; }
+    case 'OPS':  { const v = computeOps(stats); return v != null ? v.toFixed(3) : ''; }
+    case 'W':    return Math.round(stats.wins).toString();
+    case 'QS':   return Math.round(stats.qs).toString();
+    case 'SV':   return Math.round(stats.saves).toString();
+    case 'K':    return Math.round(stats.strikeouts).toString();
+    case 'ERA':  { const v = computeEra(stats); return v != null ? v.toFixed(2) : ''; }
+    case 'WHIP': { const v = computeWhip(stats); return v != null ? v.toFixed(2) : ''; }
+    default:     return '';
+  }
+}
+
+function PlayerRow({ player, categories }: { player: Player; categories: readonly string[] }) {
   const positions = player.positions?.join('/') ?? '';
   const value = player.auctionValue?.toFixed(1) ?? '—';
   const inflated = player.inflatedValue?.toFixed(1) ?? '—';
@@ -37,9 +59,25 @@ function PlayerRow({ player }: { player: Player }) {
       }`}>
         {surplus !== '—' ? `$${surplus}` : '—'}
       </td>
+      {categories.map((cat) => {
+        const sgp = player.categoryValues?.[cat];
+        const proj = getProjectedStat(player.rosProjection, cat);
+        const sgpStr = sgp != null ? sgp.toFixed(1) : '—';
+        return (
+          <td key={cat} className="text-right py-2 px-3 text-gray-400 text-xs whitespace-nowrap">
+            {sgp != null ? <><span className="text-gray-200">{sgpStr}</span>{proj ? ` (${proj})` : ''}</> : '—'}
+          </td>
+        );
+      })}
       <td className="py-2 px-3 text-gray-500 text-xs">{player.rosterStatus}</td>
     </tr>
   );
+}
+
+function makeCategoryHeaders(categories: readonly string[]) {
+  return categories.map((cat) => (
+    <th key={cat} className="text-right py-2 px-3">{cat}</th>
+  ));
 }
 
 export default function Rosters() {
@@ -60,8 +98,8 @@ export default function Rosters() {
     p.positions?.some((pos: string) => pos === 'SP' || pos === 'RP'),
   );
 
-  const tableHeaders = (
-    <tr className="text-gray-500 border-b border-gray-800">
+  const baseHeaders = (
+    <>
       <th className="text-left py-2 px-3">Name</th>
       <th className="text-left py-2 px-3">Pos</th>
       <th className="text-left py-2 px-3">Team</th>
@@ -70,6 +108,21 @@ export default function Rosters() {
       <th className="text-right py-2 px-3">VORP</th>
       <th className="text-right py-2 px-3">Salary</th>
       <th className="text-right py-2 px-3">Surplus</th>
+    </>
+  );
+
+  const hitterHeaders = (
+    <tr className="text-gray-500 border-b border-gray-800">
+      {baseHeaders}
+      {makeCategoryHeaders(HITTER_CATS)}
+      <th className="py-2 px-3">Status</th>
+    </tr>
+  );
+
+  const pitcherHeaders = (
+    <tr className="text-gray-500 border-b border-gray-800">
+      {baseHeaders}
+      {makeCategoryHeaders(PITCHER_CATS)}
       <th className="py-2 px-3">Status</th>
     </tr>
   );
@@ -125,14 +178,14 @@ export default function Rosters() {
 
           {/* Hitters table */}
           {hitters.length > 0 && (
-            <div className="bg-gray-900 border border-gray-800 rounded-lg overflow-hidden">
+            <div className="bg-gray-900 border border-gray-800 rounded-lg overflow-x-auto">
               <div className="px-4 py-2 border-b border-gray-800">
                 <h3 className="text-sm font-medium text-gray-400">Hitters ({hitters.length})</h3>
               </div>
               <table className="w-full text-sm">
-                <thead>{tableHeaders}</thead>
+                <thead>{hitterHeaders}</thead>
                 <tbody>
-                  {hitters.map((p) => <PlayerRow key={p.id} player={p} />)}
+                  {hitters.map((p) => <PlayerRow key={p.id} player={p} categories={HITTER_CATS} />)}
                 </tbody>
               </table>
             </div>
@@ -140,14 +193,14 @@ export default function Rosters() {
 
           {/* Pitchers table */}
           {pitchers.length > 0 && (
-            <div className="bg-gray-900 border border-gray-800 rounded-lg overflow-hidden">
+            <div className="bg-gray-900 border border-gray-800 rounded-lg overflow-x-auto">
               <div className="px-4 py-2 border-b border-gray-800">
                 <h3 className="text-sm font-medium text-gray-400">Pitchers ({pitchers.length})</h3>
               </div>
               <table className="w-full text-sm">
-                <thead>{tableHeaders}</thead>
+                <thead>{pitcherHeaders}</thead>
                 <tbody>
-                  {pitchers.map((p) => <PlayerRow key={p.id} player={p} />)}
+                  {pitchers.map((p) => <PlayerRow key={p.id} player={p} categories={PITCHER_CATS} />)}
                 </tbody>
               </table>
             </div>

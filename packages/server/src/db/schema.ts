@@ -15,6 +15,7 @@ export const players = sqliteTable('players', {
   rosterStatus: text('roster_status').notNull().default('FA'),
   contractSalary: real('contract_salary'),
   contractYears: integer('contract_years'),
+  contractStatus: text('contract_status'),
   isKeeper: integer('is_keeper', { mode: 'boolean' }).default(false),
 
   // Current season stats (JSON)
@@ -26,6 +27,7 @@ export const players = sqliteTable('players', {
   inflatedValue: real('inflated_value'),
   vorp: real('vorp'),
   sgpValue: real('sgp_value'),
+  categoryValues: text('category_values'), // JSON Record<string, number>
 
   createdAt: text('created_at').notNull().$defaultFn(() => new Date().toISOString()),
   updatedAt: text('updated_at').notNull().$defaultFn(() => new Date().toISOString()),

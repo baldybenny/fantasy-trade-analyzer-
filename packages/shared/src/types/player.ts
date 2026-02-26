@@ -23,6 +23,7 @@ export enum RosterStatus {
 export interface Contract {
   salary: number;
   yearsRemaining: number;
+  contractStatus: string; // "1st", "2nd", "3rd", or a year like "2026", "2027"
   isKeeper: boolean;
   extensionYear: number;
   guaranteed: boolean;
@@ -131,6 +132,7 @@ export interface Player {
   inflatedValue?: number;
   vorp?: number;
   sgpValue?: number;
+  categoryValues?: Record<string, number>;
 }
 
 export function getPlayerSurplusValue(player: Player): number | null {
@@ -213,6 +215,7 @@ export const PlayerStatsSchema = z.object({
 export const ContractSchema = z.object({
   salary: z.number(),
   yearsRemaining: z.number(),
+  contractStatus: z.string().default(''),
   isKeeper: z.boolean(),
   extensionYear: z.number().default(0),
   guaranteed: z.boolean().default(true),
