@@ -1,4 +1,4 @@
-import { createApp } from './app.js';
+import { createApp, serveClient } from './app.js';
 
 // Import and run migration on startup
 import './db/migrate.js';
@@ -9,6 +9,9 @@ const PORT = process.env.PORT || 3001;
 // Register routes (will be added in Phase 4)
 import { registerRoutes } from './routes/index.js';
 registerRoutes(app);
+
+// Static client serving must come after API routes
+serveClient(app);
 
 app.listen(PORT, () => {
   console.log(`Fantasy Trade Analyzer API running on http://localhost:${PORT}`);

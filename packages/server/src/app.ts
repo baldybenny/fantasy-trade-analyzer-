@@ -21,13 +21,14 @@ export function createApp() {
     res.status(500).json({ error: err.message || 'Internal server error' });
   });
 
-  // Serve static client files in production
+  return app;
+}
+
+export function serveClient(app: express.Express) {
   const __dirname = path.dirname(fileURLToPath(import.meta.url));
   const clientDist = path.join(__dirname, '../../client/dist');
   app.use(express.static(clientDist));
   app.get('*', (_req, res) => {
     res.sendFile(path.join(clientDist, 'index.html'));
   });
-
-  return app;
 }
